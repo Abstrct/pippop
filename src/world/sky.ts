@@ -10,6 +10,10 @@ export interface SkyStage extends Stage {
   set(kids: SkyKid[]): void;
   select(i: number | null): void;
   roll(from: number, to: number): void;
+  /** Where kid i's mat hangs right now, in the world (for a helping hand to point at), or null. */
+  anchor(i: number): THREE.Vector3 | null;
+  /** How many kids hang here, and which one is me (-1 for nobody). */
+  count(): { n: number; me: number };
 }
 
 const HOOPS = [{ r: 3.2, y: 5.6 }, { r: 5.6, y: 3.6 }, { r: 8.0, y: 1.6 }, { r: 10.4, y: -0.4 }, { r: 12.8, y: -2.4 }, { r: 15.2, y: -4.4 }];
@@ -156,6 +160,8 @@ export function skyStage(on: { pick: (i: number | null) => void; hover?: (i: num
       if (selTag) { group.remove(selTag); selTag.material.map?.dispose(); selTag = null; }
       if (i != null && kids[i] && !kids[i].me) { selTag = wordSprite(kids[i].name, { bg: '#FFFFFF', size: 0.45 }); group.add(selTag); }
     },
+    anchor(i) { if (i < 0 || i >= slots.length) return null; group.updateMatrixWorld(); return group.localToWorld(placeOf(i, performance.now() / 1000, new THREE.Vector3())); },
+    count: () => ({ n: Math.min(kids.length, slots.length), me }),
     roll(from, to) {
       if (from < 0 || to < 0 || from >= kids.length || to >= kids.length) return;
       const w = new THREE.Group();

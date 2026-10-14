@@ -14,6 +14,7 @@ import { bubble } from './core/dom';
 import { audio, ambience } from './core/audio';
 import { world } from './world/world';
 import { mountHud, shout } from './ui/hud';
+import { mountGuide } from './ui/hand';
 import { kidName, oops, verbOf, toy, toyOfLedgerName } from './lore';
 import type { Screen, Ctx } from './screens/types';
 
@@ -138,6 +139,11 @@ live.onTx((tx) => {
   }
 });
 
+/* Mobile browsers zoom on a pinch or a quick double tap; zoomed in, the game's fixed controls no longer
+ * sit under the finger. The page never zooms (the 3D mat has its own pinch); text fields still can. */
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+document.addEventListener('dblclick', (e) => { if (!(e.target as HTMLElement | null)?.closest?.('input, textarea')) e.preventDefault(); }, { passive: false });
+
 /* Escape closes the top box, with its safe answer. */
 document.addEventListener('keydown', (e) => {
   if (e.defaultPrevented) return;
@@ -171,6 +177,7 @@ async function boot() {
     if (wallet.state === 'empty') history.replaceState(null, '', '#/hi');
   }
   await route().catch((e) => console.error('[pippop] route', e));
+  mountGuide();
   const b = document.getElementById('boot');
   b?.classList.add('gone');
   setTimeout(() => b?.remove(), 900);

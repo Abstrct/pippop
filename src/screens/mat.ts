@@ -257,6 +257,19 @@ export function mat(ctx: Ctx): Screen {
           icon(toy(s.typeId).icon, 40), mini ? h('span', { class: 'mini' }, icon(mini, 22)) : null);
       })));
   }
+  /** Each block, the open card's progress moves on in place: the bar slides and the time ticks, and
+   * nothing else on the card is rebuilt (so nothing blinks under a finger). */
+  function tickCard() {
+    const bar = card.querySelector<HTMLElement>('.progress[role=progressbar]');
+    if (!sel || !bar) return;
+    const shake = shakeOf(sel);
+    if (!shake) { keepFocus(card, () => paintCard(player())); return; }
+    const e = pow.eta(shake), pct = String(Math.round(e.frac * 100));
+    const fill = bar.querySelector<HTMLElement>('.bar i'), time = bar.querySelector('b');
+    if (fill && fill.style.width !== pct + '%') fill.style.width = pct + '%';
+    if (time && time.textContent !== fmtWait(e.secs)) time.textContent = fmtWait(e.secs);
+    if (bar.getAttribute('aria-valuenow') !== pct) bar.setAttribute('aria-valuenow', pct);
+  }
   function paintProgress(p: PlayerState | null) {
     if (!p) return;
     for (const s of p.structs.values()) {
@@ -310,7 +323,7 @@ export function mat(ctx: Ctx): Screen {
     const raid = tx.events.find((e) => e.type === 'EventRaid');
     if (raid && JSON.stringify(raid.data).includes(p.planetId)) stage.rite('grab');
   }));
-  offs.push(empire.onChange(paint), wallet.onChange(paint), live.onBlock(() => { const p = player(); paintProgress(p); if (sel) keepFocus(card, () => paintCard(p)); }));
+  offs.push(empire.onChange(paint), wallet.onChange(paint), live.onBlock(() => { const p = player(); paintProgress(p); tickCard(); }));
   window.addEventListener('resize', paint);
   paint();
 

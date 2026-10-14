@@ -131,7 +131,7 @@ export function shelfStage(on: { pick: (type: number | null) => void; hover?: (t
 
   const stage: ShelfStage = {
     group,
-    view: { pos: new THREE.Vector3(0, 4.6, 16), look: new THREE.Vector3(0, 4.2, 0), fitWidth: 14 },
+    view: { pos: new THREE.Vector3(0, 4.6, 16), look: new THREE.Vector3(0, 4.4, 0), fitWidth: 14, fitHeight: 9.2 },
     spin: false,
     tick(t, dt) {
       for (const [type, x] of toys) {

@@ -70,33 +70,60 @@ export function mountHud(root: HTMLElement) {
 
   /* the busy tray: every shake (proof of work) with its progress ring, and every rite in flight */
   const KIND_ICON: Record<PowTask['kind'], string> = { build: 'make', mine: 'dig', refine: 'pop', raid: 'grab' };
+  const RING = 2 * Math.PI * 17;
   function ring(pct: number) {
     const NS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', '0 0 42 42'); svg.classList.add('ring');
     const c = (cls: string) => { const x = document.createElementNS(NS, 'circle'); x.setAttribute('cx', '21'); x.setAttribute('cy', '21'); x.setAttribute('r', '17'); x.setAttribute('fill', 'none'); x.setAttribute('stroke-width', '6'); x.setAttribute('class', cls); return x; };
     const bg = c('bg'), fg = c('fg');
-    const L = 2 * Math.PI * 17;
-    fg.setAttribute('stroke-dasharray', String(L)); fg.setAttribute('stroke-dashoffset', String(L * (1 - Math.max(0.04, Math.min(1, pct)))));
-    fg.setAttribute('stroke-linecap', 'round'); fg.setAttribute('transform', 'rotate(-90 21 21)');
+    fg.setAttribute('stroke-dasharray', String(RING)); fg.setAttribute('stroke-linecap', 'round'); fg.setAttribute('transform', 'rotate(-90 21 21)');
     svg.append(bg, fg);
+    setRing(svg, pct);
     return svg;
+  }
+  function setRing(svg: Element | null, pct: number) {
+    const fg = svg?.querySelector('circle.fg');
+    const v = String(RING * (1 - Math.max(0.04, Math.min(1, pct))));
+    if (fg && fg.getAttribute('stroke-dashoffset') !== v) fg.setAttribute('stroke-dashoffset', v);
   }
   function toyOfTask(t: PowTask): number {
     for (const pl of empire.players.values()) { const s = pl.structs.get(t.objectId); if (s) return s.typeId; }
     return 0;
   }
+  /* The tray is kept, not redrawn: each chip (one per shake, one per rite in flight) is built once and
+   * then only its ring, time and label change. A chip is rebuilt only when what it is changes (its
+   * kind, its toy, waiting or not), so nothing re-pops or blinks as the blocks tick by. */
+  const chips = new Map<string, { el: HTMLElement; sig: string }>();
+  function keep(key: string, sig: string, build: () => HTMLElement, update: (el: HTMLElement) => void, order: string[]) {
+    order.push(key);
+    let c = chips.get(key);
+    if (!c || c.sig !== sig) {
+      const el = build();
+      if (c) c.el.replaceWith(el);
+      c = { el, sig }; chips.set(key, c);
+    }
+    update(c.el);
+  }
   function paintBusy() {
-    clear(busy);
     const mine = new Set(wallet.playerIds());
+    const order: string[] = [];
     const tasks = pow.active.filter((t) => t.account >= 0 && mine.has(t.playerId));
     for (const t of tasks.slice(0, 5)) {
       const e = pow.eta(t);
       const tId = toyOfTask(t);
-      busy.append(h('div', { class: 'chip' + (t.waits ? ' wait' : ''), role: 'img', 'aria-label': `${verbWord(t.kind)} ${tId ? toy(tId).word : ''} ${fmtWait(e.secs)}` },
-        ring(e.frac),
-        h('span', { class: 'shaker' }, icon('shake', 28)),
-        icon(KIND_ICON[t.kind], 28), tId ? icon(toy(tId).icon, 28) : null,
-        t.waits ? icon('bear', 24) : h('span', { class: 'eta' }, fmtWait(e.secs))));
+      const label = `${verbWord(t.kind)} ${tId ? toy(tId).word : ''} ${fmtWait(e.secs)}`;
+      keep('pow:' + t.id, [t.kind, tId, !!t.waits].join('|'),
+        () => h('div', { class: 'chip' + (t.waits ? ' wait' : ''), role: 'img' },
+          ring(e.frac),
+          h('span', { class: 'shaker' }, icon('shake', 28)),
+          icon(KIND_ICON[t.kind], 28), tId ? icon(toy(tId).icon, 28) : null,
+          t.waits ? icon('bear', 24) : h('span', { class: 'eta' }, '')),
+        (el) => {
+          setRing(el.querySelector('svg.ring'), e.frac);
+          const eta = el.querySelector('.eta'); const w = fmtWait(e.secs);
+          if (eta && eta.textContent !== w) eta.textContent = w;
+          if (el.getAttribute('aria-label') !== label) el.setAttribute('aria-label', label);
+        }, order);
     }
     const jobs = txq.active.filter((j) => j.source !== 'pow' && (!j.playerId || mine.has(j.playerId)));
     for (const j of jobs.slice(0, 4)) {
@@ -105,11 +132,17 @@ export function mountHud(root: HTMLElement) {
       const val = (m?.value || {}) as Record<string, unknown>;
       const tId = Number(val.structTypeId) || (() => { const sid = String(val.structId || val.operatingStructId || val.defenderStructId || ''); for (const pl of empire.players.values()) { const s = pl.structs.get(sid); if (s) return s.typeId; } return 0; })();
       const waitWhy = j.status === 'waiting' && j.waitReason ? oops(j.waitReason) : null;
-      busy.append(h('div', { class: 'chip' + (waitWhy ? ' wait' : ''), role: 'img', 'aria-label': v.w },
-        h('span', { class: 'ring', style: { display: 'grid', placeItems: 'center' } }, h('span', { class: j.status === 'pending' || j.status === 'signing' ? 'spin' : '' }, icon(waitWhy ? waitWhy.i : 'tick', 30))),
-        icon(v.i, 28), tId && typeOf(tId) ? icon(toy(tId).icon, 28) : null,
-        h('span', null, v.w)));
+      const busyNow = j.status === 'pending' || j.status === 'signing';
+      keep('tx:' + j.id, [v.w, tId, waitWhy?.i || '', busyNow].join('|'),
+        () => h('div', { class: 'chip' + (waitWhy ? ' wait' : ''), role: 'img', 'aria-label': v.w },
+          h('span', { class: 'ring', style: { display: 'grid', placeItems: 'center' } }, h('span', { class: busyNow ? 'spin' : '' }, icon(waitWhy ? waitWhy.i : 'tick', 30))),
+          icon(v.i, 28), tId && typeOf(tId) ? icon(toy(tId).icon, 28) : null,
+          h('span', null, v.w)),
+        () => {}, order);
     }
+    // chips that finished leave; the rest stay where they are (moving a chip would replay its pop-in)
+    for (const [k, c] of chips) if (!order.includes(k)) { c.el.remove(); chips.delete(k); }
+    order.forEach((k, i) => { const el = chips.get(k)!.el; if (busy.children[i] !== el) busy.insertBefore(el, busy.children[i] || null); });
   }
   const verbWord = (k: PowTask['kind']) => ({ build: 'Make', mine: 'Dig', refine: 'Pop', raid: 'Grab' })[k];
 

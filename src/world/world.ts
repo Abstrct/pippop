@@ -8,7 +8,7 @@ import { P, felt, stepTweens, tween, ease, disposeTree } from './kit';
 export interface Stage {
   group: THREE.Group;
   /** Where the camera likes to sit for this stage, and what it looks at. */
-  view: { pos: THREE.Vector3; look: THREE.Vector3; fov?: number; /** world units that must fit across the screen */ fitWidth?: number };
+  view: { pos: THREE.Vector3; look: THREE.Vector3; fov?: number; /** world units that must fit across the screen */ fitWidth?: number; /** …and up and down, in the space the page leaves open */ fitHeight?: number };
   /** Drag turns the stage (true), or nothing. */
   spin?: boolean;
   tick(t: number, dt: number): void;
@@ -169,7 +169,13 @@ class World {
   /** Move the camera's resting spot (a stage changes what it wants to show). */
   aim(pos: THREE.Vector3, look: THREE.Vector3) { this.camGoal = { pos: pos.clone(), look: look.clone() }; }
   rumble(power = 0.5) { this.shake = Math.max(this.shake, power); }
+  /** Give a spinnable stage a push, as a finger dragging across it would (the helping hand's demo). */
+  nudge(v = 0.05) { if (this.stage?.spin) this.spinV = v; }
   frame0(px: number) { this.frameX = px; }
+  /** Page furniture covering the top and bottom of the screen (px): the stage is centred, and fitted,
+   * in the space between. */
+  private inset = { top: 0, bottom: 0 };
+  frameInset(top: number, bottom: number) { this.inset = { top: Math.max(0, top), bottom: Math.max(0, bottom) }; }
 
   /* ── input: drag to spin, tap to pick, wheel to zoom ── */
   private ray = new THREE.Raycaster();
@@ -262,7 +268,8 @@ class World {
     if (this.shake > 0.001) { this.camera.position.x += (Math.random() - 0.5) * this.shake * 0.3; this.camera.position.y += (Math.random() - 0.5) * this.shake * 0.3; this.shake *= 0.88; }
     this.camera.lookAt(this.camLook);
     // shift the view so the stage sits in the open space between the panels
-    if (this.frameX) this.camera.setViewOffset(this.canvas.clientWidth, this.canvas.clientHeight, this.frameX, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+    const offY = Math.round((this.inset.bottom - this.inset.top) / 2);
+    if (this.frameX || offY) this.camera.setViewOffset(this.canvas.clientWidth, this.canvas.clientHeight, this.frameX, offY, this.canvas.clientWidth, this.canvas.clientHeight);
     else if (this.camera.view?.enabled) this.camera.clearViewOffset();
     this.renderer.render(this.scene, this.camera);
   }
@@ -273,8 +280,12 @@ class World {
     const fw = st?.view.fitWidth;
     // close-ups (the camera aimed at one toy) keep their own distance; only the room's view fits the width
     if (!fw || !st || st.view.pos.distanceTo(this.camGoal.pos) > 0.01) return a >= 1.2 ? 1 : 1 + (1.2 - a) * 0.6;
-    const half = Math.atan(Math.tan((this.camera.fov * Math.PI) / 360) * a);
-    const need = fw / 2 / Math.tan(half);
+    const tv = Math.tan((this.camera.fov * Math.PI) / 360);
+    const half = Math.atan(tv * a);
+    let need = fw / 2 / Math.tan(half);
+    // the height has to fit in what the page leaves open, not the whole screen
+    const fh = st.view.fitHeight, H = this.canvas.clientHeight || 1;
+    if (fh) { const open = Math.max(0.3, (H - this.inset.top - this.inset.bottom) / H); need = Math.max(need, fh / (2 * tv * open)); }
     const base = this.camGoal.pos.distanceTo(this.camGoal.look);
     return Math.max(1, need / Math.max(1, base));
   }

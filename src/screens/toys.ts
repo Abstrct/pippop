@@ -117,8 +117,20 @@ export function toys(ctx: Ctx): Screen {
     }
     strip.hidden = sel != null && matchMedia('(max-width: 760px)').matches;
     keepFocus(card, () => paintCard(p));
+    requestAnimationFrame(frameShelf);
   }
-  const offs = [empire.onChange(paint), wallet.onChange(paint)];
+  /** The shelf sits in the space the top bar, the toy strip, the dock (and a phone's card) leave open. */
+  function frameShelf() {
+    const top = (document.querySelector('.top') as HTMLElement | null)?.getBoundingClientRect().bottom ?? 0;
+    const phone = matchMedia('(max-width: 760px)').matches;
+    const covers = [strip, phone ? card : null, document.querySelector('.dock') as HTMLElement | null]
+      .filter((e): e is HTMLElement => !!e && !e.hidden && e.getClientRects().length > 0)
+      .map((e) => e.getBoundingClientRect().top);
+    const bottom = covers.length ? innerHeight - Math.min(...covers) : 0;
+    world.frameInset(top + 8, bottom + 8);
+  }
+  window.addEventListener('resize', frameShelf);
+  const offs = [empire.onChange(paint), wallet.onChange(paint), () => window.removeEventListener('resize', frameShelf), () => world.frameInset(0, 0)];
   paint();
   if (sel) setTimeout(() => choose(sel), 300);
   return { el, title: 'Toys', leave: () => { offs.forEach((f) => f()); world.frame0(0); } };
