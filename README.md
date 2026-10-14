@@ -18,6 +18,8 @@ Env (read at build time): `VITE_LCD_URL`, `VITE_RPC_WS_URL` (default: the public
 
 The Sky reads the Guild API when it can. Your own key signs `LOGIN_GUILD…` to your club's API, then the map is a handful of small reads (players, rocks, last moves, rosters). Directly, that needs the guild to answer CORS with this page's origin plus `Allow-Credentials`, and its session cookie to survive a cross-site request (`SameSite=None; Secure`). Through the relay, the relay holds the cookie. A guild that can't keep a session either way is remembered for the visit, and the Sky reads the chain instead, so nothing breaks.
 
+**Shipping:** every push to `main` deploys to GitHub Pages (pippop.pet), and CI typechecks, builds twice and smoke-tests every room in headless Chrome. See [docs/CI-AND-DEPLOY.md](docs/CI-AND-DEPLOY.md).
+
 ## Sharing and search
 
 The site lives at **https://pippop.pet**. `index.html` carries everything a link preview or search engine reads: title and description, a canonical URL, Open Graph and Twitter `summary_large_image` tags with a 1200×630 share card, `theme-color` (the red stripe on Discord embeds), icons and a web app manifest, `VideoGame` structured data (JSON-LD, pointing at Structs as what it is based on), and a crawlable description for visitors without JavaScript. `public/` adds `robots.txt` (everything allowed, for every crawler), `sitemap.xml` and `llms.txt` (the game explained for AI crawlers).

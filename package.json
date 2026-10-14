@@ -9,7 +9,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "start": "node serve.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke.mjs",
+    "brand": "node scripts/brand.mjs"
   },
   "dependencies": {
     "@noble/curves": "^2.4.0",
@@ -25,5 +27,6 @@
     "typescript": "^7.0.2",
     "undici": "^8.11.2",
     "vite": "^8.3.4"
-  }
+  },
+  "packageManager": "pnpm@9.15.9"
 }

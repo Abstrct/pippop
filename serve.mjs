@@ -80,6 +80,8 @@ async function resolveFile(pathname) {
 }
 
 async function serveStatic(req, res) {
+  // the container's health check
+  if (req.url === '/healthz') { res.writeHead(200, { ...BASE_HEADERS, 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }); res.end('ok'); return; }
   if (req.method === 'OPTIONS') { res.writeHead(204, { ...BASE_HEADERS, 'access-control-max-age': '86400' }); res.end(); return; }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { ...BASE_HEADERS, allow: 'GET, HEAD, OPTIONS' }); res.end(); return; }
   const url = new URL(req.url || '/', 'http://x');

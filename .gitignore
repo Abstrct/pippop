@@ -4,3 +4,4 @@ dist
 *.log
 devnet/.home
 playtest/runs/
+.smoke

@@ -26,7 +26,7 @@ class World {
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
   private stage: Stage | null = null;
-  private clock = new THREE.Clock();
+  private timer = new THREE.Timer();
   private t = 0;
   private canvas!: HTMLCanvasElement;
   private camLook = new THREE.Vector3();
@@ -50,7 +50,7 @@ class World {
     r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.08;
-    r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+    r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFShadowMap;
 
     this.scene.background = new THREE.Color(0x8fd3f2);
     this.scene.fog = new THREE.Fog(0xcdeefc, 40, 150);
@@ -236,7 +236,8 @@ class World {
   }
 
   private frame() {
-    const dt = Math.min(0.05, this.clock.getDelta());
+    this.timer.update();
+    const dt = Math.min(0.05, this.timer.getDelta());
     this.t += dt;
     const t = this.t;
     stepTweens(performance.now());
