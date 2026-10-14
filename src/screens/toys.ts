@@ -61,10 +61,17 @@ export function toys(ctx: Ctx): Screen {
     const dmg = Math.max(w1 ? w1.damage * w1.shots : 0, w2 ? w2.damage * w2.shots : 0);
     const shakes = t.buildDifficulty <= 250 ? 1 : t.buildDifficulty <= 460 ? 2 : 3;
     const have = p ? owned(p, t.id) : 0;
+    // Make (or why not) comes first, right under the name: the facts below can scroll
+    const go = no ? h('p', { class: 'note' }, icon(no.i, 32), no.w,
+        no.w === 'Juice' && p ? h('span', { class: 'state', style: { marginLeft: 'auto' } }, fmtJuice(p.capacity + p.connectionCapacity - p.load - p.structsLoad > 0n ? p.capacity + p.connectionCapacity - p.load - p.structsLoad : 0n), ' / ', short(Math.round(t.buildDraw / 1000))) : null,
+        no.w === 'Nap' ? h('a', { class: 'pill small sun', href: '#/', style: { marginLeft: 'auto' } }, icon('bear', 22), icon('wake', 22)) : null,
+        no.w === 'Play' ? h('a', { class: 'pill small red', href: '#/hi', style: { marginLeft: 'auto' } }, 'Play') : null)
+        : h('button', { type: 'button', class: 'pill huge red wiggle', onclick: () => make(p!, t) }, icon('make', 44), 'Make', h('span', { class: 'cost', title: 'Wind' }, icon('wind', 18), '≥' + t.buildCharge));
     card.append(
       h('button', { type: 'button', class: 'round x', 'aria-label': 'Close', onclick: () => choose(null), style: { width: '52px', height: '52px' } }, icon('close', 34)),
       h('div', { class: 'toy-head' }, icon(T.icon, 64), h('div', { class: 'stack', style: { gap: '6px' } }, h('h2', { class: 'big-word' }, T.word),
         h('span', { class: 'row', style: { gap: '6px' } }, h('span', { class: 'state' }, icon(isMat ? 'mat' : 'wagon', 26), isMat ? 'Mat' : 'Go'), have ? h('span', { class: 'state' }, icon('check', 24), '×' + have) : null))),
+      go,
       h('div', { class: 'facts' },
         h('span', { class: 'fact', title: 'Hearts' }, icon('heart', 30), String(t.maxHealth)),
         h('span', { class: 'fact', title: 'Juice' }, icon('juice', 30), short(Math.round(t.buildDraw / 1000))),
@@ -77,12 +84,7 @@ export function toys(ctx: Ctx): Screen {
         t.planetaryRefinery !== 'noPlanetaryRefinery' ? h('span', { class: 'fact' }, icon('rock', 26), icon('pop', 26), icon('star', 26)) : null,
         t.generatingRate > 0 ? h('span', { class: 'fact' }, icon('star', 26), icon('go', 22), icon('juice', 26)) : null,
         t.planetaryShieldContribution > 0 ? h('span', { class: 'fact' }, icon('fort', 28), '+' + t.planetaryShieldContribution) : null,
-        t.id === 18 ? h('span', { class: 'fact' }, icon('rock', 26), icon('lock', 26)) : null),
-      no ? h('p', { class: 'note' }, icon(no.i, 32), no.w,
-        no.w === 'Juice' && p ? h('span', { class: 'state', style: { marginLeft: 'auto' } }, fmtJuice(p.capacity + p.connectionCapacity - p.load - p.structsLoad > 0n ? p.capacity + p.connectionCapacity - p.load - p.structsLoad : 0n), ' / ', short(Math.round(t.buildDraw / 1000))) : null,
-        no.w === 'Nap' ? h('a', { class: 'pill small sun', href: '#/', style: { marginLeft: 'auto' } }, icon('bear', 22), icon('wake', 22)) : null,
-        no.w === 'Play' ? h('a', { class: 'pill small red', href: '#/hi', style: { marginLeft: 'auto' } }, 'Play') : null)
-        : h('button', { type: 'button', class: 'pill huge red wiggle', onclick: () => make(p!, t) }, icon('make', 44), 'Make', h('span', { class: 'cost', title: 'Wind' }, icon('wind', 18), '≥' + t.buildCharge)));
+        t.id === 18 ? h('span', { class: 'fact' }, icon('rock', 26), icon('lock', 26)) : null));
   }
 
   function make(p: PlayerState, t: StructType) {

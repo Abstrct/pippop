@@ -1,5 +1,5 @@
-/* The busy box: a toddler's activity board that rolls in while a toy is being unwrapped (its proof of
- * work is grinding). A peekaboo door hides the toy that is coming, with its ring filling up; a flower
+/* The busy box: a toddler's activity board that rolls in whenever proof of work is grinding (a toy
+ * being unwrapped, a Digger digging, a Popper popping, a grab). A peekaboo door hides the toy at work, with its ring filling up; a flower
  * spinner to flick; beads to push along a wavy wire; three switches that light three lamps; a knob that
  * clicks round. Playing helps for real: every twirl tells the engine to hash on every spare core for a
  * little while (pow.boost), and the sparkle in the corner shines while it does. */
@@ -27,12 +27,16 @@ export function mountBusyBox() {
   box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Busy');
   const tab = document.createElement('button');
   tab.type = 'button'; tab.className = 'busytab'; tab.hidden = true; tab.setAttribute('aria-label', 'Busy');
-  tab.append(icon('gift', 32));
+  // the tab is the board's own flower in small: it turns slowly, and fast while playing helps
+  const mini = s('svg', { viewBox: '-40 -40 80 80', width: 40, height: 40, class: 'busy-flower' });
+  ['#E4002B', '#FFC72C', '#0077C8', '#43B02A', '#FF8F1C', '#8246AF'].forEach((c, i) => mini.append(s('ellipse', { cx: 0, cy: -20, rx: 12, ry: 18, fill: c, stroke: '#1D2A5C', 'stroke-width': 2.5, transform: `rotate(${i * 60})` })));
+  mini.append(s('circle', { r: 12, fill: '#FFF8E7', stroke: '#1D2A5C', 'stroke-width': 2.5 }), s('circle', { cx: -4, cy: -2, r: 2, fill: '#1D2A5C' }), s('circle', { cx: 4, cy: -2, r: 2, fill: '#1D2A5C' }), s('path', { d: 'M-4.5 3 q4.5 4.5 9 0', stroke: '#1D2A5C', 'stroke-width': 2, fill: 'none', 'stroke-linecap': 'round' }));
+  tab.append(mini);
   const shut = document.createElement('button');
   shut.type = 'button'; shut.className = 'round busy-x'; shut.setAttribute('aria-label', 'Close'); shut.append(icon('close', 26));
   const spark = document.createElement('span'); spark.className = 'busy-spark'; spark.append(icon('sparkle', 30));
   document.body.append(box);
-  // the gift button leads the tray of work chips (the hud's .busy)
+  // the flower button leads the tray of work chips (the hud's .busy)
   const dockTab = () => { const tray = document.querySelector('.busy'); if (tray && tray.firstElementChild !== tab) tray.prepend(tab); };
 
   /* ── the board ── */
@@ -224,7 +228,7 @@ export function mountBusyBox() {
   knob.addEventListener('keydown', (e) => { const k = (e as KeyboardEvent).key; if (k === 'ArrowRight' || k === 'ArrowUp') { e.preventDefault(); setStop(stop + 1); help(); } if (k === 'ArrowLeft' || k === 'ArrowDown') { e.preventDefault(); setStop(stop - 1); help(); } });
 
   /* ── when it shows ── */
-  let open = false, dismissed = false, forced = false, had = false, toyShown = -1;
+  let open = false, dismissed = false, forced = false, had = false, toyShown = '';
   shut.addEventListener('click', () => { dismissed = true; forced = false; setOpen(false); audio.chime('boop'); });
   tab.addEventListener('click', () => { dismissed = false; forced = true; setOpen(true); audio.chime('open'); });
   function setOpen(v: boolean) {
@@ -235,7 +239,7 @@ export function mountBusyBox() {
   }
   const mine = (): PowTask[] => {
     const p = empire.commander;
-    return p ? pow.active.filter((t) => t.kind === 'build' && t.playerId === p.playerId && t.status !== 'failed') : [];
+    return p ? pow.active.filter((t) => t.playerId === p.playerId && t.status !== 'failed') : [];
   };
   function paintSpark() { spark.classList.toggle('on', pow.boosting); }
   function paint() {
@@ -261,7 +265,10 @@ export function mountBusyBox() {
     const soon = tasks.map((t) => ({ t, e: pow.eta(t) })).sort((a, b) => a.e.secs - b.e.secs)[0];
     const s0 = empire.commander?.structs.get(soon.t.objectId);
     const typeId = s0?.typeId ?? 0;
-    if (typeId !== toyShown) { toyShown = typeId; toyImg.setAttribute('href', svgUri(iconSvg(typeId ? toy(typeId).icon : 'gift', 112))); }
+    // a toy being made, or the Digger/Popper at work; a grab (raid) has no toy of its own
+    const face = typeId ? toy(typeId).icon : soon.t.kind === 'raid' ? 'grab' : 'gift';
+    if (face !== toyShown) { toyShown = face; toyImg.setAttribute('href', svgUri(iconSvg(face, 112))); }
+    tab.classList.toggle('fast', pow.boosting);
     const c = 2 * Math.PI * 44;
     ring.setAttribute('stroke-dashoffset', String(c * (1 - soon.e.frac)));
     wait.textContent = fmtWait(soon.e.secs);
