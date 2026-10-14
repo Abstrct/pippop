@@ -6,7 +6,7 @@ import { shout } from '../ui/hud';
 import { world } from '../world/world';
 import { matStage } from '../world/mat';
 import { empire, type OwnedStruct, type PlayerState } from '../game/empire';
-import { act, actionBlock, canRetry, findBlock, matToysOn, verbsFor } from '../game/actions';
+import { act, actionBlock, buildBlock, canRetry, findBlock, matToysOn, verbsFor } from '../game/actions';
 import { wallet } from '../wallet/wallet';
 import { txq, type TxJob } from '../wallet/queue';
 import { claimJob, releaseClaim } from '../core/claims';
@@ -20,6 +20,10 @@ import { owned, raidersAt, realmOf, unitsOf } from '../realm';
 import type { Ctx, Screen } from './types';
 
 const LEVEL_ICON: Record<string, string> = { moon: 'moon', sky: 'cloud', grass: 'grass', tub: 'tub' };
+
+// Bears already welcomed back this visit, and when we last started one on our own
+const CAME_BACK = new Set<string>((() => { try { return (sessionStorage.getItem('pippop.bearback') || '').split(',').filter(Boolean); } catch { return []; } })());
+let autoMake = 0;
 
 export function mat(ctx: Ctx): Screen {
   const watching = ctx.param && !wallet.byPlayer(ctx.param) ? ctx.param : null;
@@ -284,6 +288,26 @@ export function mat(ctx: Ctx): Screen {
     }
   }
 
+  /** No Bear? On your own mat it comes back by itself: the Make starts on its own, and while the new
+   * Bear is in its gift box a glowing Bear and a swirl of stars float down into it. */
+  function bearBack(p: PlayerState) {
+    if (!mine()) return;
+    const bear = [...p.structs.values()].find((s) => s.typeId === 1 && !s.destroyed);
+    if (bear && !bear.built && !CAME_BACK.has(bear.id)) {
+      CAME_BACK.add(bear.id);
+      try { sessionStorage.setItem('pippop.bearback', [...CAME_BACK].join(',')); } catch { /* fine */ }
+      setTimeout(() => { if (!el.isConnected) return; stage.comeback(bear.id); audio.chime('whoosh'); setTimeout(() => { audio.chime('yay'); shout('Bear!', 'bear'); }, 2600); }, 700);
+    }
+    const making = txq.active.some((j) => j.msgs.some((m) => m.typeUrl.endsWith('MsgStructBuildInitiate') && Number((m.value as Record<string, unknown>).structTypeId) === 1));
+    if (!bear && !making && p.planetId && wallet.unlocked && !buildBlock(p, typeOf(1)) && Date.now() - autoMake > 60_000) {
+      autoMake = Date.now();
+      setTimeout(() => {
+        const q = player();
+        if (!el.isConnected || !q || [...q.structs.values()].some((s) => s.typeId === 1 && !s.destroyed)) return;
+        const t = typeOf(1); if (t) rite(q, () => act.build(q, t, 'land', 0), false);
+      }, 1200);
+    }
+  }
   let shownFor: string | null = null, hatchDone = false;
   function paint() {
     const p = player();
@@ -296,6 +320,7 @@ export function mat(ctx: Ctx): Screen {
       const units = unitsOf(p);
       const shield = num(p.planet?.planetAttributes?.planetaryShield);
       paintProgress(p);
+      bearBack(p);
       stage.sync(units, { ground: num(p.planet?.gridAttributes?.ore), rocks: p.ore, fort: Math.min(1, shield / 120), wagonHome: p.fleet?.status !== 'away', name: kidName(p), club: clubColor(p.guildId), empty: !p.planetId });
       if (!hatchDone && !watching) {
         hatchDone = true;

@@ -74,7 +74,7 @@ export function bonkStage(on: { pick: (id: string | null) => void; hover?: (id: 
 
   const stage: BonkStage = {
     group,
-    view: { pos: new THREE.Vector3(0, 9, 21), look: new THREE.Vector3(0, 1.4, 0), fitWidth: 16 },
+    view: { pos: new THREE.Vector3(0, 9, 21), look: new THREE.Vector3(0, 1.4, 0), fitWidth: 16, fitHeight: 9 },
     spin: false,
     tick(t, dt) {
       for (const { ctl, hearts } of toys.values()) { ctl.tick(t, dt); hearts.rotation.y = -ctl.root.rotation.y + Math.sin(t * 2) * 0.25; }

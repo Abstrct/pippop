@@ -15,6 +15,7 @@ import { audio, ambience } from './core/audio';
 import { world } from './world/world';
 import { mountHud, shout } from './ui/hud';
 import { mountGuide } from './ui/hand';
+import { mountBusyBox } from './ui/busybox';
 import { kidName, oops, verbOf, toy, toyOfLedgerName } from './lore';
 import type { Screen, Ctx } from './screens/types';
 
@@ -178,6 +179,7 @@ async function boot() {
   }
   await route().catch((e) => console.error('[pippop] route', e));
   mountGuide();
+  mountBusyBox();
   const b = document.getElementById('boot');
   b?.classList.add('gone');
   setTimeout(() => b?.remove(), 900);

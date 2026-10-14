@@ -7,6 +7,7 @@ import { icon } from '../ui/icons';
 import { shout } from '../ui/hud';
 import { world } from '../world/world';
 import { bonkStage, type BonkUnit } from '../world/bonk';
+import { bonkBubble } from '../world/replay';
 import { empire, type OwnedStruct, type PlayerState } from '../game/empire';
 import { act, actionBlock } from '../game/actions';
 import { wallet } from '../wallet/wallet';
@@ -155,6 +156,9 @@ export function bonk(ctx: Ctx): Screen {
       applyBlow(bw, height);
       if (!sh) return;
       const onId = sh.blockerId || sh.targetId;
+      // the same bonk again, up close, in a bubble
+      bonkBubble.play({ a: bw.attackerType, b: (sh.blockerId ? sh.blockerType : sh.targetType) || sh.targetType, mine, miss: sh.evaded, guard: !!sh.blockerId,
+        dmg: sh.damage, felled: sh.blockerId ? sh.blockerFelled : sh.targetFelled, back: sh.back + sh.counters.reduce((n, c) => n + c.dmg, 0), aFelled: bw.attackerFelled });
       stage.strike(bw.attackerId, onId, { miss: sh.evaded, mine, done: () => {
         if (sh.evaded) { stage.pop(sh.targetId, 'Boing!', 'miss'); audio.chime('boing'); }
         else { stage.pop(onId, sh.damage ? `-${sh.damage}` : 'Bonk!', sh.blockerId ? 'guard' : 'hit'); audio.chime('bonk'); }
@@ -167,6 +171,9 @@ export function bonk(ctx: Ctx): Screen {
         if (sh.targetFelled && isWyrm(empire.ownerOf(sh.targetId)?.structs.get(sh.targetId))) setTimeout(() => shout(mine ? 'Bonk!' : 'Uh oh!', 'bear', mine ? 'yay' : 'uh'), 900);
       } });
       if (!mine) bubble('Bonk', 'bonk', 'uh', { toy: toy(bw.attackerType).icon });
+      // our Bear is out of hearts: this round is over, home to the mat (where it comes back)
+      const bearOut = !!p && ((sh.targetFelled && sh.targetType === 1 && sh.targetOwner === p.playerId) || (sh.blockerFelled && sh.blockerType === 1 && sh.targetOwner === p.playerId) || (bw.attackerFelled && bw.attackerType === 1 && mine));
+      if (bearOut) setTimeout(() => { if (el.isConnected) ctx.go('#/'); }, 4200);
     });
     paint();
   }
@@ -278,14 +285,27 @@ export function bonk(ctx: Ctx): Screen {
     settle();
     paintScene();
     keepFocus(el, () => { paintBar(); paintSide(); paintStrike(); });
+    requestAnimationFrame(frameArena);
   }
+  /** The arena sits in the space the step bar, the side list and the Bonk panel leave open, so the
+   * bonking is always in view. */
+  function frameArena() {
+    if (!el.isConnected) return;
+    const shown = (e: Element | null): e is HTMLElement => !!e && !(e as HTMLElement).hidden && e.getClientRects().length > 0;
+    const tops = [barBox, document.querySelector('.top')].filter(shown).map((e) => e.getBoundingClientRect().bottom);
+    const lows = [strikeBox, document.querySelector('.dock')].filter(shown).map((e) => e.getBoundingClientRect().top);
+    world.frameInset((tops.length ? Math.max(...tops) : 0) + 6, lows.length ? innerHeight - Math.min(...lows) + 6 : 0);
+    world.frame0(shown(sideBox) ? -Math.round(sideBox.getBoundingClientRect().right / 2) : 0);
+  }
+  window.addEventListener('resize', frameArena);
+  offs.push(() => window.removeEventListener('resize', frameArena), () => { world.frameInset(0, 0); world.frame0(0); });
   let soon = 0;
   offs.push(empire.onChange(paint), wallet.onChange(paint), live.onBlock(paint), txq.onChange(() => paintStrikeSoon()));
-  function paintStrikeSoon() { if (soon) return; soon = requestAnimationFrame(() => { soon = 0; keepFocus(el, paintStrike); }); }
+  function paintStrikeSoon() { if (soon) return; soon = requestAnimationFrame(() => { soon = 0; keepFocus(el, paintStrike); frameArena(); }); }
   paint();
   void REALM_OF_AMBIT;
   return {
     el, title: 'Bonk',
-    leave: () => { offs.forEach((f) => f()); claims.forEach(releaseClaim); for (const w of watched) empire.unwatch(w); },
+    leave: () => { bonkBubble.stop(); offs.forEach((f) => f()); claims.forEach(releaseClaim); for (const w of watched) empire.unwatch(w); },
   };
 }

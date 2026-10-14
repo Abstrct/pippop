@@ -21,6 +21,8 @@ export interface MatStage extends Stage {
   progress(id: string, frac: number | null, color?: string, label?: string): void;
   /** A tap on a decoration: it wobbles. */
   boing(id: string): void;
+  /** The Bear comes back: a glowing Bear and a swirl of stars float down into its gift box. */
+  comeback(id: string): void;
 }
 
 const LEVEL: Record<Realm, { y: number; r: number }> = { tub: { y: -0.34, r: 5.35 }, grass: { y: 0.02, r: 2.95 }, sky: { y: 3.05, r: 3.05 }, moon: { y: 5.75, r: 2.45 } };
@@ -260,6 +262,42 @@ export function matStage(on: { pick: (id: string | null) => void; hover?: (id: s
         case 'wake': case 'nap': break;
       }
       toyAt(id)?.ctl.squash(1);
+    },
+    comeback(id) {
+      const t = toys.get(id); if (!t) return;
+      const home = t.ctl.root.position.clone();
+      // a golden Bear, half there, drifting down out of the sky
+      const ghost = makeToy(1);
+      const glow = new THREE.MeshStandardMaterial({ color: 0xFFD45C, emissive: 0xFFA800, emissiveIntensity: 0.55, roughness: 0.25, metalness: 0.3, transparent: true, opacity: 0 });
+      ghost.root.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = glow; });
+      ghost.root.rotation.copy(t.ctl.root.rotation);
+      toyRoot.add(ghost.root);
+      const stars = Array.from({ length: 10 }, () => { const m = part(starGeo(), plastic(P.sun, { glow: 0.5 }), home.x, home.y, home.z, 0.001); group.add(m); return m; });
+      const ring = part(geo.ring(1, 0.06, 64), new THREE.MeshBasicMaterial({ color: P.sun, transparent: true, opacity: 0, depthWrite: false }), home.x, home.y + 0.06, home.z);
+      ring.rotation.x = Math.PI / 2; group.add(ring);
+      const y0 = ghost.root.rotation.y;
+      tween(2.6, (k) => {
+        const down = ease.inOut(Math.min(1, k / 0.85));
+        ghost.root.position.set(home.x, home.y + 3.4 - down * 3.1, home.z);
+        ghost.root.scale.setScalar(1.35 - Math.max(0, k - 0.6) / 0.4 * 0.85);
+        ghost.root.rotation.y = y0 + Math.sin(k * Math.PI * 3) * 0.35;
+        glow.opacity = Math.min(1, k / 0.2) * 0.8 * (k > 0.82 ? Math.max(0, 1 - (k - 0.82) / 0.18) : 1);
+        stars.forEach((m, i) => {
+          const a = (i / stars.length) * Math.PI * 2 + k * Math.PI * 6, r = 2.3 * (1 - k) + 0.25;
+          m.position.set(home.x + Math.cos(a) * r, home.y + 0.6 + (1 - k) * 2.8 + Math.sin(k * Math.PI * 4 + i) * 0.15, home.z + Math.sin(a) * r);
+          m.rotation.y = k * 10 + i;
+          m.scale.setScalar(0.3 * Math.min(1, k / 0.15) * (k > 0.9 ? Math.max(0.001, 1 - (k - 0.9) / 0.1) : 1));
+        });
+      }, { ease: ease.lin, done: () => {
+        toyRoot.remove(ghost.root); ghost.dispose(); glow.dispose();
+        for (const m of stars) group.remove(m);
+        const now = toys.get(id);
+        now?.ctl.squash(1.4);
+        confetti(group, home.clone().add(new THREE.Vector3(0, 0.8, 0)), { n: 50, power: 3, stars: true });
+        world.rumble(0.3);
+        const rm = ring.material as THREE.MeshBasicMaterial;
+        tween(0.9, (k) => { ring.scale.setScalar(0.3 + k * 2.6); rm.opacity = 1 - k; }, { done: () => { group.remove(ring); rm.dispose(); } });
+      } });
     },
     dispose() { for (const { ctl } of toys.values()) ctl.dispose(); },
   };

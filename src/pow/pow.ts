@@ -99,6 +99,24 @@ class PowEngine {
   }
 
   onChange(f: Fn) { this.listeners.add(f); f(); return () => this.listeners.delete(f); }
+
+  /* Playing with the busy box helps for real: for a little while after each twirl the engine hashes
+   * on every spare core, and tries puzzles one notch harder than it otherwise would (a lucky early
+   * find lands sooner). */
+  private boostUntil = 0;
+  private boostTimer = 0;
+  get boosting() { return Date.now() < this.boostUntil; }
+  boost(ms = 8000) {
+    const was = this.boosting;
+    this.boostUntil = Date.now() + ms;
+    clearTimeout(this.boostTimer);
+    this.boostTimer = window.setTimeout(() => { this.schedule(); this.emit(); }, ms + 50);
+    if (!was) { this.schedule(); this.emit(); }
+  }
+  private threadsNow() {
+    const cores = navigator.hardwareConcurrency || 4;
+    return this.boosting ? Math.max(this.settings.threads, Math.min(12, cores - 1)) : this.settings.threads;
+  }
   private emit() {
     if (this.emitTimer) return;
     this.emitTimer = window.setTimeout(() => { this.emitTimer = 0; safeEach(this.listeners, (f) => f()); }, 120);
@@ -253,13 +271,13 @@ class PowEngine {
     const gpuOn = active && this.settings.engine !== 'cpu';
     if (gpuOn) this.openGpu();
     const g = gpuOn ? this.gpuHasher : null;
-    const want = active && !(g && this.settings.engine === 'gpu') ? this.settings.threads : 0;
+    const want = active && !(g && this.settings.engine === 'gpu') ? this.threadsNow() : 0;
     const height = live.height;
     const candidates = [...this.tasks.values()]
       .filter((t) => (t.status === 'idle' || t.status === 'hashing') && height > 0)
       .filter((t) => wallet.account(t.account))
       .map((t) => ({ t, req: this.required(t, height) }))
-      .filter(({ t, req }) => req <= this.settings.startAt || (t.best && t.best.zeros >= req - 1) || req <= this.reachable())
+      .filter(({ t, req }) => req <= this.settings.startAt || (t.best && t.best.zeros >= req - 1) || req <= this.reachable() + (this.boosting ? 1 : 0))
       .sort((a, b) => a.req - b.req || a.t.createdAt - b.t.createdAt);
     // The GPU takes the hardest task it can expect to crack within a minute (else the easiest),
     // leaving the CPU threads the rest; with a single task they share it.
