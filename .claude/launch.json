@@ -1,0 +1,44 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "pippop",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "5197",
+        "--strictPort"
+      ],
+      "port": 5197
+    },
+    {
+      "name": "pippop-devnet",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "VITE_GRASS_URL=off",
+        "VITE_LCD_URL=http://127.0.0.1:41317",
+        "VITE_RPC_WS_URL=ws://127.0.0.1:46657/websocket",
+        "STRUCTS_LCD=http://127.0.0.1:41317",
+        "VITE_DEFAULT_GUILD=0-1",
+        "npx",
+        "vite",
+        "--config",
+        "devnet/vite.config.mjs",
+        "--port",
+        "5198",
+        "--strictPort"
+      ],
+      "port": 5198
+    },
+    {
+      "name": "pippop-static",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "serve.mjs",
+        "8097"
+      ],
+      "port": 8097
+    }
+  ]
+}

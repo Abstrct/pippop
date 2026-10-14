@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pip Pop: dig, pop, bonk! A 3D toy-box game with real players</title>
+  <meta name="description" content="Pip Pop is a free 3D toy-box game in your browser. Dig rocks, pop them into stars, make toys and bonk your pals. Every kid you meet is a real player on the Structs network.">
+  <link rel="canonical" href="https://pippop.pet/">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="theme-color" content="#E4002B">
+  <meta name="color-scheme" content="light">
+  <meta name="application-name" content="Pip Pop">
+  <meta name="apple-mobile-web-app-title" content="Pip Pop">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- link previews: Open Graph (Discord, Slack, Facebook, LinkedIn, iMessage, WhatsApp) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Pip Pop">
+  <meta property="og:url" content="https://pippop.pet/">
+  <meta property="og:title" content="Pip Pop: dig, pop, bonk!">
+  <meta property="og:description" content="A free 3D toy-box game in your browser. Dig rocks, pop them into stars, make toys and bonk your pals. Every kid you meet is a real player.">
+  <meta property="og:image" content="https://pippop.pet/og.png">
+  <meta property="og:image:secure_url" content="https://pippop.pet/og.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Pip Pop: a red awning logo beside a shelf of chunky 3D toys: a crowned teddy bear, a rocket, a windmill, a smiling sun and a piggy bank.">
+  <meta property="og:locale" content="en_US">
+  <!-- link previews: X / Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Pip Pop: dig, pop, bonk!">
+  <meta name="twitter:description" content="A free 3D toy-box game in your browser. Dig, pop, make toys and bonk your pals: every kid is a real player.">
+  <meta name="twitter:image" content="https://pippop.pet/og.png">
+  <meta name="twitter:image:alt" content="Pip Pop: a red awning logo beside a shelf of chunky 3D toys.">
+
+  <!-- icons and install -->
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="icon" href="./favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png" sizes="180x180">
+  <link rel="manifest" href="./manifest.webmanifest">
+
+  <style>
+    .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .nojs { position: relative; z-index: 60; max-width: 640px; margin: 40px auto; padding: 28px; border-radius: 32px; background: #FFF8E7; color: #1D2A5C; font: 500 18px/1.5 Fredoka, system-ui, sans-serif; }
+    .nojs-logo { display: inline-block; margin: 0; padding: 6px 22px 10px; border-radius: 22px 22px 6px 6px; background: #E4002B; color: #fff; font-size: 36px; font-weight: 700; }
+    .nojs a { color: #0077C8; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://pippop.pet/#site",
+        "url": "https://pippop.pet/",
+        "name": "Pip Pop",
+        "inLanguage": "en"
+      },
+      {
+        "@type": "VideoGame",
+        "@id": "https://pippop.pet/#game",
+        "name": "Pip Pop",
+        "alternateName": "Pip Pop: dig, pop, bonk!",
+        "url": "https://pippop.pet/",
+        "image": "https://pippop.pet/og.png",
+        "description": "A free 3D toy-box game in your browser. Dig rocks, pop them into stars, make toys, roll your wagon to other kids' play mats and bonk their bear. Every kid you meet is a real player on the Structs network.",
+        "genre": ["Strategy", "Casual", "Multiplayer", "Building"],
+        "gamePlatform": ["Web browser", "Desktop", "Mobile"],
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Any (web browser)",
+        "playMode": "MultiPlayer",
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "isPartOf": { "@id": "https://pippop.pet/#site" },
+        "isBasedOn": { "@type": "VideoGame", "name": "Structs", "url": "https://playstructs.com" },
+        "subjectOf": { "@type": "WebPage", "name": "Structs technical documentation", "url": "https://structs.ai" }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <h1 class="sr">Pip Pop: dig, pop, bonk!</h1>
+  <canvas id="world" aria-hidden="true"></canvas>
+  <div id="boot" class="boot">
+    <svg class="boot-key" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11C9 3 4 5 4 8s4 3 8 3c4 0 8 0 8-3s-5-5-8 3z" fill="#FFC72C" stroke="#1D2A5C" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 11v10M9 18h6" fill="none" stroke="#1D2A5C" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <p class="boot-word">Pip Pop</p>
+  </div>
+  <div id="app"></div>
+  <noscript>
+    <main class="nojs">
+      <p class="nojs-logo">Pip Pop</p>
+      <h2>Dig. Pop. Bonk!</h2>
+      <p>Pip Pop is a free 3D toy-box game that plays in your browser. Open a gift to meet your crowned teddy bear, then grow a play mat full of chunky toys: a digger digs rocks, a popper pops them into stars, and stars fill your club's fridge with juice to make even more toys.</p>
+      <p>Roll your wagon to other kids' mats, bonk their bear and grab the rocks they left lying out. Every kid you meet is a real player on the Structs network.</p>
+      <h2>Rooms</h2>
+      <ul>
+        <li><b>Mat</b>: your play mat and its toys, on a stacking pole of Moon, Sky, Grass and Tub.</li>
+        <li><b>Toys</b>: a shelf of 22 toys to make, from the Digger and Popper to the Rocket, Duck and Sun.</li>
+        <li><b>Sky</b>: every kid's mat hanging from a giant crib mobile.</li>
+        <li><b>Bonk</b>: roll, bonk and grab.</li>
+        <li><b>Fridge</b>: turn stars into juice.</li>
+        <li><b>Book</b>: a picture dictionary of every symbol.</li>
+      </ul>
+      <p>Pip Pop needs JavaScript and WebGL. Learn more about <a href="https://playstructs.com">Structs</a>, or read the <a href="https://structs.ai">Structs technical documentation</a>.</p>
+    </main>
+  </noscript>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

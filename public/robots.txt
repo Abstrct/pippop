@@ -1,0 +1,5 @@
+# Pip Pop is open to everyone: search engines, link previews, archives and AI crawlers alike.
+User-agent: *
+Allow: /
+
+Sitemap: https://pippop.pet/sitemap.xml

@@ -1,0 +1,29 @@
+{
+  "name": "pippop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pip Pop: dig, pop, bonk! A toy-box skin that plays the real Structs network, drawn in three.js.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "start": "node serve.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "@scure/base": "^2.4.0",
+    "@scure/bip32": "^2.4.0",
+    "@scure/bip39": "^2.4.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/three": "^0.186.0",
+    "typescript": "^7.0.2",
+    "undici": "^8.11.2",
+    "vite": "^8.3.4"
+  }
+}
