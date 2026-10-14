@@ -1,0 +1,80 @@
+# Check every pull request and every push to main: typecheck, build twice (at a domain's root and under
+# a project path), then open every room in headless Chrome against the live testnet.
+# The deploy (pages.yml) runs on its own and repeats the typecheck and build; a red smoke test does not
+# block it, because the smoke test depends on the public testnet being up.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6   # the version in package.json's packageManager
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build (domain root, https://pippop.pet)
+        run: pnpm build
+
+      - name: Build under a project path (what a fork's Pages site gets)
+        run: |
+          VITE_SITE_URL=https://example.github.io/pippop pnpm build
+          test -f dist/404.html
+          grep -q 'href="/pippop/manifest.webmanifest"' dist/index.html
+          grep -q 'https://example.github.io/pippop/sitemap.xml' dist/robots.txt
+
+  smoke:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # let Chrome's sandbox start on Ubuntu 24.04
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Every room, desktop and phone, at the domain root
+        run: pnpm smoke
+        env:
+          SMOKE_SHOTS: smoke-shots/root
+
+      - name: Every room under a project path (any request outside the base fails)
+        run: pnpm smoke
+        env:
+          SMOKE_QUICK: 1
+          SMOKE_SITE: https://example.github.io/pippop
+          SMOKE_SHOTS: smoke-shots/project
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: smoke-shots
+          path: smoke-shots
+          retention-days: 7
