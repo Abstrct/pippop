@@ -1,6 +1,6 @@
 /* My Mat: your toys, read live from the ledger and stood up in 3D. Tap a toy for its card; every
  * button signs a real transaction. `#/mat/<kid>` peeks at another kid's mat (look, no touch). */
-import { h, clear, bubble, confirmBox, keepFocus, holdButton } from '../core/dom';
+import { h, clear, bubble, confirmBox, keepFocus, holdButton, morph } from '../core/dom';
 import { icon } from '../ui/icons';
 import { shout } from '../ui/hud';
 import { world } from '../world/world';
@@ -85,8 +85,13 @@ export function mat(ctx: Ctx): Screen {
   }
 
   /* ── the signs: what needs you ── */
-  function paintSigns(p: PlayerState | null) {
-    clear(signs);
+  /* each painter builds a fresh copy and morphs it in: only what changed is touched, so nothing that
+   * stayed the same blinks or loses a tap that is already under a finger */
+  const signsBox = signs, cardBox = card, stripBox = strip;
+  function paintSigns(p: PlayerState | null) { const t = h('div'); buildSigns(t, p); morph(signsBox, t); }
+  function paintCard(p: PlayerState | null) { const t = h('div'); buildCard(t, p); morph(cardBox, t); cardBox.hidden = t.hidden; }
+  function paintStrip(p: PlayerState | null) { const t = h('div'); buildStrip(t, p); morph(stripBox, t); stripBox.hidden = t.hidden; }
+  function buildSigns(signs: HTMLElement, p: PlayerState | null) {
     const out: HTMLElement[] = [];
     const sign = (tone: 'uh' | 'yay' | '', ic: string, w: string, action?: [string, string, () => void], extra?: Node) => out.push(h('div', { class: 'sign ' + tone, role: 'status' }, icon(ic, 36), h('span', { class: 'w' }, w), extra || null,
       action ? h('button', { type: 'button', class: 'pill small ' + (tone === 'uh' ? 'red' : 'sun'), onclick: action[2] }, icon(action[1], 22), action[0]) : null));
@@ -131,8 +136,7 @@ export function mat(ctx: Ctx): Screen {
   }
 
   /* ── the toy card ── */
-  function paintCard(p: PlayerState | null) {
-    clear(card);
+  function buildCard(card: HTMLElement, p: PlayerState | null) {
     const s = p && sel ? p.structs.get(sel) : undefined;
     card.hidden = !s || !s.type || s.destroyed;
     fab.classList.toggle('lifted', !card.hidden);
@@ -241,9 +245,8 @@ export function mat(ctx: Ctx): Screen {
     fab.hidden = true;
   }
 
-  function paintStrip(p: PlayerState | null) {
-    clear(strip);
-    strip.hidden = !p || (!card.hidden && matchMedia('(max-width: 760px)').matches);
+  function buildStrip(strip: HTMLElement, p: PlayerState | null) {
+    strip.hidden = !p || (!cardBox.hidden && matchMedia('(max-width: 760px)').matches);
     if (!p) return;
     const shield = num(p.planet?.planetAttributes?.planetaryShield);
     const toys = [...p.structs.values()].filter((s) => !s.destroyed && s.type).sort((a, b) => (a.typeId === 1 ? -1 : b.typeId === 1 ? 1 : 0) || (a.type!.category === 'planet' ? 1 : 0) - (b.type!.category === 'planet' ? 1 : 0) || a.typeId - b.typeId);

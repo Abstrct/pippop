@@ -2,7 +2,7 @@
  * until it is out of hearts, and the shake engine grabs their rocks by itself (MsgPlanetRaidComplete).
  * When someone rolls onto your mat, this is where you bonk them back. Every bonk is MsgStructAttack;
  * the odds come from the ledger's own rules (game/war.ts). */
-import { h, clear, bubble, keepFocus } from '../core/dom';
+import { h, bubble, keepFocus, morph } from '../core/dom';
 import { icon } from '../ui/icons';
 import { shout } from '../ui/hud';
 import { world } from '../world/world';
@@ -31,6 +31,8 @@ export function bonk(ctx: Ctx): Screen {
   const bar = h('div', { class: 'war', role: 'group', 'aria-label': 'Steps' });
   const side = h('section', { class: 'card panel left stack hide-phone wide-only', 'aria-label': 'Toys' });
   const strike = h('section', { class: 'card panel center strike', 'aria-label': 'Bonk' });
+  // the live sections; each paint builds a fresh copy and morphs these to match, so only what changed changes
+  const barBox = bar, sideBox = side, strikeBox = strike;
   const el = h('div', null, bar, side, strike);
 
   let target: string | null = ctx.param || null;
@@ -191,8 +193,8 @@ export function bonk(ctx: Ctx): Screen {
     if (sig !== sceneSig) { sceneSig = sig; stage.set(a.map(unit), b.map(unit), { oursName: p ? kidName(p) : undefined, theirsName: f ? kidName(f) : undefined }); }
     stage.mark('a', atk); stage.mark('t', mark);
   }
-  function paintBar() {
-    clear(bar);
+  function paintBar() { const t = h('div'); buildBar(t); morph(barBox, t); barBox.hidden = t.hidden; }
+  function buildBar(bar: HTMLElement) {
     const f = foe();
     const theirBear = wyrmOf(f);
     const bearDown = !theirBear || !alive(theirBear) || !wardKeeper(f);
@@ -206,8 +208,8 @@ export function bonk(ctx: Ctx): Screen {
     if (f && fort) bar.append(h('span', { class: 'st done', role: 'img', 'aria-label': `Fort ${fort}`, title: 'Fort' }, icon('fort', 30), String(fort)));
     bar.hidden = !f;
   }
-  function paintSide() {
-    clear(side);
+  function paintSide() { const t = h('div'); buildSide(t); morph(sideBox, t); sideBox.hidden = t.hidden; }
+  function buildSide(side: HTMLElement) {
     const p = me(), f = foe();
     const row = (title: string, ic: string, list: OwnedStruct[], pick: (id: string) => void, on: string | null) => h('div', { class: 'side-list' },
       h('h3', null, icon(ic, 30), title),
@@ -216,8 +218,8 @@ export function bonk(ctx: Ctx): Screen {
     if (f) side.append(row(kidName(f), 'kid', theirs(f), chooseT, mark));
     side.hidden = !p && !f;
   }
-  function paintStrike() {
-    clear(strike);
+  function paintStrike() { const t = h('div'); buildStrike(t); morph(strikeBox, t); }
+  function buildStrike(strike: HTMLElement) {
     const p = me(), f = foe();
     if (!p) { strike.append(h('a', { class: 'pill huge red', href: '#/hi' }, icon('gift', 44), 'Play')); return; }
     if (!f) {

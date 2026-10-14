@@ -12,7 +12,7 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, props?: Props |
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props || {})) {
     if (v == null || v === false) continue;
-    if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v as EventListener);
+    if (k.startsWith('on') && typeof v === 'function') hook(el, k.slice(2).toLowerCase(), v as (e: Event) => void);
     else if (k === 'style' && typeof v === 'object') for (const [sk, sv] of Object.entries(v as Record<string, string>)) { if (sk.startsWith('--')) el.style.setProperty(sk, String(sv)); else (el.style as unknown as Record<string, string>)[sk] = sv; }
     else if (k === 'class') el.className = String(v);
     else if (k in el && k !== 'list' && k !== 'form') (el as unknown as Record<string, unknown>)[k] = v;
@@ -25,6 +25,25 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, props?: Props |
   };
   children.forEach(add);
   return el;
+}
+
+/* Handlers go through a small table, not straight onto the element, so morph() can keep an old node
+ * and still give it the new node's handlers (which see the game as it is now, not as it was). */
+const hooks = new WeakMap<Node, Record<string, ((e: Event) => void) | undefined>>();
+export function hook(el: Element, type: string, fn: (e: Event) => void) {
+  let hs = hooks.get(el);
+  if (!hs) { hs = {}; hooks.set(el, hs); }
+  if (!(type in hs)) el.addEventListener(type, (e) => hooks.get(el)?.[type]?.(e));
+  hs[type] = fn;
+}
+function adopt(a: Node, b: Node) {
+  const ha = hooks.get(a), hb = hooks.get(b);
+  if (ha) for (const t in ha) if (!hb?.[t]) ha[t] = undefined;
+  if (hb && a instanceof Element) for (const t in hb) if (hb[t]) hook(a, t, hb[t]!);
+}
+function adoptTree(a: Node, b: Node) {
+  adopt(a, b);
+  for (let x = a.firstChild, y = b.firstChild; x && y; x = x.nextSibling, y = y.nextSibling) adoptTree(x, y);
 }
 
 export function clear(el: Element) { while (el.firstChild) el.removeChild(el.firstChild); }
@@ -102,13 +121,13 @@ export function confirmBox(title: string, _text: string | string[] = '', ok: str
  * does nothing, so a child's quick poke is safe. Works with a finger, a mouse, or held Enter/Space. */
 export function holdButton(cls: string, ic: string, word: string, run: () => void, ms = 1400): HTMLButtonElement {
   let t0 = 0, raf = 0, done = false;
-  const b = h('button', { type: 'button', class: `pill hold ${cls}`, 'aria-label': `${word} (hold)`, title: 'Hold' }, icon(ic, 28), word, h('span', { class: 'hold-ic', 'aria-hidden': 'true' }, icon('tick', 18))) as HTMLButtonElement;
+  const b = h('button', { type: 'button', class: `pill hold ${cls}`, 'data-own-style': '', 'aria-label': `${word} (hold)`, title: 'Hold' }, icon(ic, 28), word, h('span', { class: 'hold-ic', 'aria-hidden': 'true' }, icon('tick', 18))) as HTMLButtonElement;
   const set = (k: number) => b.style.setProperty('--k', String(k));
   const stop = () => { cancelAnimationFrame(raf); t0 = 0; if (!done) set(0); };
   const step = () => {
     const k = Math.min(1, (performance.now() - t0) / ms);
     set(k);
-    if (k >= 1) { done = true; audio.chime('pop'); run(); setTimeout(() => { done = false; set(0); }, 600); return; }
+    if (k >= 1) { done = true; audio.chime('pop'); b.dispatchEvent(new Event('held')); setTimeout(() => { done = false; set(0); }, 600); return; }
     raf = requestAnimationFrame(step);
   };
   const start = () => { if (t0 || done) return; t0 = performance.now(); audio.chime('tap'); raf = requestAnimationFrame(step); };
@@ -117,5 +136,30 @@ export function holdButton(cls: string, ic: string, word: string, run: () => voi
   b.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); start(); } });
   b.addEventListener('keyup', (e) => { if (e.key === 'Enter' || e.key === ' ') stop(); });
   b.addEventListener('click', (e) => e.preventDefault());
+  hook(b, 'held', () => run());
   return b;
+}
+
+/** Make `target`'s children match `fresh`'s, touching only what changed. A node that is the same is
+ * left exactly where it is (so its animation keeps playing and a finger already on it keeps its tap);
+ * changed text is updated in place; an element whose own attributes are unchanged is patched inside;
+ * anything else is replaced. A node that is kept takes over the fresh node's handlers. */
+export function morph(target: Element, fresh: Element) {
+  const now = [...target.childNodes], want = [...fresh.childNodes];
+  for (let i = 0; i < want.length; i++) {
+    const a = now[i], b = want[i];
+    if (!a) { target.appendChild(b); continue; }
+    if (a.isEqualNode(b)) { adoptTree(a, b); continue; }
+    if (a.nodeType === Node.TEXT_NODE && b.nodeType === Node.TEXT_NODE) { (a as Text).data = (b as Text).data; continue; }
+    if (a instanceof Element && b instanceof Element && a.tagName === b.tagName && sameAttrs(a, b) && !(a instanceof HTMLInputElement) && !(a instanceof HTMLTextAreaElement)) { adopt(a, b); morph(a, b); continue; }
+    target.replaceChild(b, a);
+  }
+  for (let i = want.length; i < now.length; i++) now[i].remove();
+}
+/** Attributes match; a [data-own-style] element (a hold button mid-fill) keeps its own style. */
+function sameAttrs(a: Element, b: Element) {
+  const own = a.hasAttribute('data-own-style');
+  const names = (e: Element) => [...e.attributes].map((x) => x.name).filter((n) => !(own && n === 'style'));
+  const na = names(a), nb = names(b);
+  return na.length === nb.length && na.every((n) => b.getAttribute(n) === a.getAttribute(n));
 }

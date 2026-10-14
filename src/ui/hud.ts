@@ -1,6 +1,6 @@
 /* The parts of the toy that never leave: the awning, your kid chip, the counters (stars, rocks,
  * juice, wind), the round dock buttons, the tray of shakes and rites in flight, and the big shout. */
-import { h, clear } from '../core/dom';
+import { h, clear, morph } from '../core/dom';
 import { icon } from './icons';
 import { empire } from '../game/empire';
 import { wallet } from '../wallet/wallet';
@@ -36,8 +36,14 @@ export function mountHud(root: HTMLElement) {
   function paintSound() { clear(sound); sound.append(icon(audio.quiet ? 'mute' : 'sound', 30)); }
   paintSound();
 
+  // built fresh and morphed in, so a counter that didn't change keeps its node (and a red throb keeps its beat)
   function paintTop() {
-    clear(kid); clear(meters);
+    const k = h('span'), ms = h('span');
+    buildTop(k, ms);
+    kid.classList.toggle('remind', k.classList.contains('remind'));
+    morph(kid, k); morph(meters, ms);
+  }
+  function buildTop(kid: HTMLElement, meters: HTMLElement) {
     const p = empire.commander;
     const a = wallet.active;
     const face = h('span', { class: 'face', style: { borderColor: p ? clubColor(p.guildId) : '#E4002B' } }, icon(p ? 'kid' : wallet.state === 'locked' ? 'lock' : 'gift', 28));
