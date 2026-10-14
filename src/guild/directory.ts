@@ -53,7 +53,7 @@ async function readGuild(g: RawGuild): Promise<GuildEntry> {
   const entry: GuildEntry = { id: g.id, chain: g, meta: null, services: null, error: null };
   if (!openUrl(g.endpoint)) return { ...entry, error: 'no endpoint' };
   try {
-    const r = await fetch(g.endpoint, { headers: { accept: 'application/json' }, credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(8000) });
+    const r = await fetch(g.endpoint, { headers: { accept: 'application/json' }, credentials: 'omit', referrerPolicy: 'no-referrer', signal: AbortSignal.timeout(4000) });
     const text = await r.text();
     if (text.length > 64 * 1024) return { ...entry, error: 'guild.json too large' };
     const doc = (JSON.parse(text) as { guild?: Record<string, unknown> } | null)?.guild;

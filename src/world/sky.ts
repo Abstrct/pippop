@@ -138,7 +138,9 @@ export function skyStage(on: { pick: (i: number | null) => void; hover?: (i: num
       const H = HOOPS[used - 1];
       const ly = (9.2 + H.y - 2) / 2;
       const pos = new THREE.Vector3(0, ly + 3 + H.r * 0.25, 9 + H.r * 2.0), look = new THREE.Vector3(0, ly, 0);
-      stage.view = { pos, look, fitWidth: H.r * 2 + 3 };
+      // a round mobile on a tall phone would push the camera out past the clouds: fit the middle hoops,
+      // and let the outer ones run off the sides (the mobile spins)
+      stage.view = { pos, look, fitWidth: Math.min(H.r * 2 + 3, 20) };
       if (world.current === stage) world.aim(pos, look);
       const tops = [0x7FD35B, 0x9BE3C4, 0xFFE08A, 0xBFE6FF, 0xFFC2D6, 0xD9C2F0];
       // a kid asleep for a long while has a dim, grey mat top: an easy target, or a quiet neighbour

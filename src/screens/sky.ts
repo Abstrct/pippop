@@ -35,6 +35,8 @@ export function sky(_ctx: Ctx): Screen {
   let viaGuild = false;
 
   const myId = () => empire.commander?.playerId;
+  /** A club's name once the directory has answered; until then '…', never a stand-in that changes. */
+  const clubLabel = (gid: string) => (clubs.size ? clubName(gid, clubs.get(gid)?.meta?.name) : '…');
   function apply() {
     const q = search.value.trim().toLowerCase();
     const me = myId();
@@ -80,7 +82,7 @@ export function sky(_ctx: Ctx): Screen {
     filters.append(h('button', { type: 'button', class: 'flag', 'aria-pressed': String(rich), 'aria-label': `Rocks ${richN}`, title: 'Rocks', onclick: () => { rich = !rich; apply(); } }, icon('rock', 30), String(richN)));
     for (const [gid, n] of [...count].sort((a, b) => b[1] - a[1])) {
       filters.append(h('button', { type: 'button', class: 'flag', 'aria-pressed': String(club === gid), onclick: () => { club = club === gid ? null : gid; apply(); } },
-        h('span', { class: 'sw', style: { background: clubColor(gid) } }), clubName(gid, clubs.get(gid)?.meta?.name), h('span', { class: 'small-word' }, String(n))));
+        h('span', { class: 'sw', style: { background: clubColor(gid) } }), clubLabel(gid), h('span', { class: 'small-word' }, String(n))));
     }
   }
 
@@ -107,7 +109,7 @@ export function sky(_ctx: Ctx): Screen {
         h('button', { type: 'button', class: 'round x', 'aria-label': 'Close', onclick: () => choose(null), style: { width: '52px', height: '52px' } }, icon('close', 34)),
         h('div', { class: 'toy-head' }, h('span', { style: { display: 'grid', placeItems: 'center', width: '72px', height: '72px', borderRadius: '50%', background: '#FFC72C', border: `6px solid ${clubColor(k.guildId)}` } }, icon('kid', 48)),
           h('div', { class: 'stack', style: { gap: '6px' } }, h('h2', { class: 'big-word' }, isMe ? 'Me' : kidName(k)),
-            h('span', { class: 'flag', style: { minHeight: '40px', justifySelf: 'start' } }, h('span', { class: 'sw', style: { background: clubColor(k.guildId) } }), clubName(k.guildId, clubs.get(k.guildId)?.meta?.name)))),
+            h('span', { class: 'flag', style: { minHeight: '40px', justifySelf: 'start' } }, h('span', { class: 'sw', style: { background: clubColor(k.guildId) } }), clubLabel(k.guildId)))),
         h('div', { class: 'facts' },
           h('span', { class: 'fact', title: 'Rocks' }, icon('rock', 30), String(oreNow)),
           h('span', { class: 'fact', title: 'Bear' }, icon('bear', 30), bearNow === 'gone' ? icon('gone', 26) : bearNow ? h('span', { class: 'hearts' }, ...Array.from({ length: bearNow.max }, (_, i) => icon(i < bearNow.health ? 'heart' : 'heart0', 18))) : h('span', { class: 'spin' }, icon('tick', 22))),
@@ -147,9 +149,12 @@ export function sky(_ctx: Ctx): Screen {
       // the guild's index first (a handful of small reads); the ledger only when there is no guild session
       const fast = await kidsFromGuild().catch(() => null);
       viaGuild = !!fast;
-      const [k, g] = await Promise.all([fast ? Promise.resolve(fast.list) : readKids(), guilds().catch(() => [] as GuildEntry[])]);
+      // the mats go up the moment the kids are known; club names arrive when the directory answers
+      // (a club whose guild.json never answers this page used to hold the whole sky back for seconds)
+      void guilds().then((g) => { if (left_) return; clubs = new Map(g.map((x) => [x.id, x])); paintFilters(); paintCard(); }).catch(() => {});
+      const k = fast ? fast.list : await readKids();
       if (left_) return;
-      all = k; clubs = new Map(g.map((x) => [x.id, x]));
+      all = k;
       if (fast) seen = fast.seen;
       const me = empire.commander;
       if (me && !all.some((x) => x.id === me.playerId)) all.unshift({ id: me.playerId, name: me.name, guildId: me.guildId, planetId: me.planetId, fleetId: me.fleetId, address: me.address });

@@ -114,10 +114,11 @@ class World {
       const far = i > 6;
       const c = make(i, far ? 2.2 + (i % 4) * 0.6 : 0.9 + (i % 3) * 0.3);
       // near clouds keep to the back and the sides, never between the camera and the toys
-      const a = far ? (i / 18) * Math.PI * 2 + i : Math.PI * (1.08 + (i / 7) * 0.84);
+      // clouds keep to the back and the sides, never between the camera and the toys, however far back it stands
+      const a = far ? Math.PI * (0.92 + ((i - 7) / 11) * 1.16) : Math.PI * (1.08 + (i / 7) * 0.84);
       const r = far ? 55 + (i % 5) * 12 : 20 + (i % 4) * 5;
       c.position.set(Math.cos(a) * r, far ? -6 + (i % 6) * 5 : -2 + (i % 5) * 2.6, Math.sin(a) * r - (far ? 10 : 0));
-      c.userData = { a, r, y: c.position.y, speed: (far ? 0.004 : 0.0) * (i % 2 ? 1 : -1), base: a };
+      c.userData = { a, r, y: c.position.y, speed: 0, base: a };
       this.scene.add(c); this.clouds.push(c);
     }
     // a soft sea of cloud below everything
