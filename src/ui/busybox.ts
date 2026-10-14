@@ -27,11 +27,13 @@ export function mountBusyBox() {
   box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Busy');
   const tab = document.createElement('button');
   tab.type = 'button'; tab.className = 'busytab'; tab.hidden = true; tab.setAttribute('aria-label', 'Busy');
-  tab.append(icon('gift', 40));
+  tab.append(icon('gift', 32));
   const shut = document.createElement('button');
   shut.type = 'button'; shut.className = 'round busy-x'; shut.setAttribute('aria-label', 'Close'); shut.append(icon('close', 26));
   const spark = document.createElement('span'); spark.className = 'busy-spark'; spark.append(icon('sparkle', 30));
-  document.body.append(box, tab);
+  document.body.append(box);
+  // the gift button leads the tray of work chips (the hud's .busy)
+  const dockTab = () => { const tray = document.querySelector('.busy'); if (tray && tray.firstElementChild !== tab) tray.prepend(tab); };
 
   /* ── the board ── */
   const svg = s('svg', { viewBox: '0 0 300 330', class: 'busy-board' });
@@ -237,6 +239,7 @@ export function mountBusyBox() {
   };
   function paintSpark() { spark.classList.toggle('on', pow.boosting); }
   function paint() {
+    dockTab();
     const room = document.body.dataset.room || '';
     const tasks = mine();
     const want = tasks.length > 0 && ROOMS.has(room);

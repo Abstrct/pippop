@@ -432,14 +432,13 @@ button, a, .pill, .round, .chip, .flag { touch-action: manipulation; }
 .busybox.party { animation: busy-party .7s cubic-bezier(.3,1.6,.6,1); }
 @keyframes busy-party { 0%, 100% { rotate: 0deg; } 25% { rotate: -5deg; scale: 1.05; } 60% { rotate: 4deg; } }
 .busy-star { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%,-50%); }
-.busytab { position: fixed; z-index: 9; right: 16px; top: 150px; width: 72px; height: 72px; border-radius: 50%; border: 0; display: grid; place-items: center; cursor: pointer;
-  background: radial-gradient(circle, #FFC72C 0 56%, transparent 57%), conic-gradient(#43B02A calc(var(--f, 0) * 360deg), #FFFFFF 0);
-  box-shadow: 0 6px 0 rgba(37,133,174,.55); animation: busy-bob 2.4s ease-in-out infinite; }
-.busytab .ic { width: 40px; height: 40px; }
-.busytab[data-n]:not([data-n=""])::after { content: attr(data-n); position: absolute; right: -4px; top: -4px; min-width: 26px; height: 26px; border-radius: 13px; background: #E4002B; color: #fff; font-weight: 700; font-size: 16px; display: grid; place-items: center; }
-@keyframes busy-bob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-5px) rotate(4deg); } }
+.busytab { position: relative; flex: none; width: 52px; height: 52px; border-radius: 50%; border: 0; padding: 0; display: grid; place-items: center; cursor: pointer;
+  background: radial-gradient(circle, #FFC72C 0 60%, transparent 61%), conic-gradient(#43B02A calc(var(--f, 0) * 360deg), #FFFFFF 0);
+  box-shadow: 0 5px 0 rgba(37,133,174,.55); animation: busy-wiggle 2.4s ease-in-out infinite; }
+.busytab .ic { width: 30px; height: 30px; }
+.busytab[data-n]:not([data-n=""])::after { content: attr(data-n); position: absolute; right: 0; bottom: 0; min-width: 20px; height: 20px; border-radius: 10px; background: #E4002B; color: #fff; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+@keyframes busy-wiggle { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
 @media (max-width: 760px), (max-height: 620px) {
-  .busytab { top: auto; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 100px); right: 12px; width: 62px; height: 62px; }
   .busybox { top: auto; left: 50%; right: auto; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 96px); width: min(280px, calc(100vw - 32px), calc((100dvh - 230px) * .82)); transform: translate(-50%, calc(100% + 140px)); }
   .busybox.on { transform: translate(-50%, 0); }
 }

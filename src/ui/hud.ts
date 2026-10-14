@@ -148,7 +148,9 @@ export function mountHud(root: HTMLElement) {
     }
     // chips that finished leave; the rest stay where they are (moving a chip would replay its pop-in)
     for (const [k, c] of chips) if (!order.includes(k)) { c.el.remove(); chips.delete(k); }
-    order.forEach((k, i) => { const el = chips.get(k)!.el; if (busy.children[i] !== el) busy.insertBefore(el, busy.children[i] || null); });
+    // the busy box's gift button, when it is here, leads the tray
+    const lead = busy.firstElementChild?.classList.contains('busytab') ? 1 : 0;
+    order.forEach((k, i) => { const el = chips.get(k)!.el; if (busy.children[i + lead] !== el) busy.insertBefore(el, busy.children[i + lead] || null); });
   }
   const verbWord = (k: PowTask['kind']) => ({ build: 'Make', mine: 'Dig', refine: 'Pop', raid: 'Grab' })[k];
 
