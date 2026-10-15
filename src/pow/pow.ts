@@ -50,6 +50,7 @@ export interface PowTask {
 
 type Fn = () => void;
 const SETTINGS = 'pippop.chant';
+const STEADY = 'pippop.chant.rate';
 
 export type PowEngineKind = 'auto' | 'cpu' | 'gpu';
 interface PowSettings { enabled: boolean; threads: number; startAt: number; autoSubmit: boolean; engine: PowEngineKind; signers?: Record<string, number> }
@@ -151,10 +152,22 @@ class PowEngine {
     if (!h) return { secs: Infinity, frac: 0 };
     const need = this.required(t), best = t.best?.zeros ?? 0;
     if (t.status === 'submitting' || best >= need) return { secs: 0, frac: 1 };
-    const z = Math.max(this.settings.startAt, this.reachable(), best);
+    const pace = this.steady || this.settings.threads * 2.5e6;
+    const z = Math.max(this.settings.startAt, Math.floor(Math.log(pace * 300) / Math.log(16)), best);
     const blocks = this.blocksUntil(t, z);
-    const hashing = need <= z ? Math.min(600, this.etaSeconds(need)) : 0;
-    const secs = blocks * live.blockTime + hashing;
+    const hashing = need <= z ? Math.min(600, this.etaSeconds(need, pace)) : 0;
+    const raw = blocks * live.blockTime + hashing;
+    // a time only ever counts down smoothly: good news shows at once, bad news creeps in
+    const now = performance.now(), was = this.shown.get(t.id);
+    let secs = raw;
+    if (was && Number.isFinite(was.secs)) {
+      const ticking = Math.max(0, was.secs - (now - was.at) / 1000);
+      // many places ask each second; the reckoning moves on at most once a second
+      if (now - was.at < 1000) secs = Math.min(raw, ticking);
+      else if (raw > ticking) secs = ticking + (raw - ticking) * 0.08;
+    }
+    if (!was || now - was.at >= 1000 || secs < (was.secs - (now - was.at) / 1000)) this.shown.set(t.id, { secs, at: now });
+    if (this.shown.size > 200) this.shown.clear();
     const total = Math.max(1, h + blocks - t.blockStart);
     const frac = Math.max(0.03, Math.min(0.97, (h - t.blockStart) / total - (hashing ? 0.05 : 0)));
     return { secs, frac };
@@ -403,7 +416,16 @@ class PowEngine {
     this.rateWindow = this.rateWindow.filter((x) => now - x.t < 4000);
     const n = this.rateWindow.reduce((s, x) => s + x.n, 0);
     this.rate = this.rateWindow.length ? n / 4 : 0;
+    // the steady rate: this machine's ordinary pace, slow to move, not bumped by a boost, and
+    // remembered across reloads; the times a player sees are reckoned from it so they don't jump
+    if (this.rate > 0 && !this.boosting) {
+      this.steady = this.steady ? this.steady * 0.97 + this.rate * 0.03 : this.rate;
+      if (now - this.steadySaved > 30_000) { this.steadySaved = now; try { localStorage.setItem(STEADY, String(Math.round(this.steady))); } catch { /* fine */ } }
+    }
   }
+  private steady = (() => { try { return Number(localStorage.getItem(STEADY)) || 0; } catch { return 0; } })();
+  private steadySaved = 0;
+  private shown = new Map<string, { secs: number; at: number }>();
 }
 
 /** The proofs one player owes, from their live state. */

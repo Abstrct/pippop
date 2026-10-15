@@ -257,7 +257,8 @@ export function mountBusyBox() {
     had = true;
     // the side panels (a toy's card) win the space: the box tucks into its tab
     const phone = matchMedia('(max-width: 760px), (max-height: 620px)').matches;
-    const crowded = !!document.querySelector('.toy-card:not([hidden]), .veil, .panel.right:not([hidden])');
+    // the Toys shelf fills the screen's width, so there the box starts tucked away
+    const crowded = room === 'toys' || !!document.querySelector('.toy-card:not([hidden]), .veil, .panel.right:not([hidden])');
     const show = open ? !crowded || phone || forced : !dismissed && !crowded && !phone;
     setOpen(show && !(phone && !open));
     tab.hidden = open;
