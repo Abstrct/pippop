@@ -285,7 +285,7 @@ class World {
     let need = fw / 2 / Math.tan(half);
     // the height has to fit in what the page leaves open, not the whole screen
     const fh = st.view.fitHeight, H = this.canvas.clientHeight || 1;
-    if (fh) { const open = Math.max(0.3, (H - this.inset.top - this.inset.bottom) / H); need = Math.max(need, fh / (2 * tv * open)); }
+    if (fh) { const open = Math.max(0.2, (H - this.inset.top - this.inset.bottom) / H); need = Math.max(need, fh / (2 * tv * open)); }
     const base = this.camGoal.pos.distanceTo(this.camGoal.look);
     return Math.max(1, need / Math.max(1, base));
   }

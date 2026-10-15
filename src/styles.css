@@ -225,10 +225,6 @@ button { cursor: pointer; }
 .tap-hint { font-size: 28px; font-weight: 700; color: #fff; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; animation: throb 1.4s infinite; }
 
 /* ── the book ── */
-.book { position: fixed; z-index: 6; inset: 92px 16px calc(max(14px, env(safe-area-inset-bottom)) + 112px); overflow: auto; pointer-events: auto; display: grid; justify-items: center; }
-.book-in { width: min(1100px, 100%); display: grid; gap: 22px; }
-.book-sec { display: grid; gap: 12px; }
-.book-sec h2 { margin: 0; display: inline-flex; align-items: center; gap: 10px; font-size: 34px; color: #fff; -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; text-shadow: 0 4px 0 var(--ink); }
 .words-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .wcard { display: grid; justify-items: center; gap: 4px; padding: 14px 8px 10px; border-radius: 26px; background: var(--cream); box-shadow: 0 6px 0 var(--cream-d); text-align: center; }
 .wcard .ic { width: 56px; height: 56px; }
@@ -283,7 +279,6 @@ button { cursor: pointer; }
   .busy.lifted { bottom: calc(46dvh + 104px); }
   .signs { top: 120px; }
   .war { top: 120px; max-width: calc(100vw - 20px); overflow-x: auto; }
-  .book { inset: 120px 10px calc(max(10px, env(safe-area-inset-bottom)) + 84px); }
   #bubbles { top: 120px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
@@ -340,8 +335,6 @@ body[data-room="hi"] #bubbles { bottom: auto; top: 150px; }
 .progress .ic { width: 28px; height: 28px; }
 .progress .bar { flex: 1; height: 16px; border-radius: 999px; background: #E6F4FB; overflow: hidden; border: 3px solid var(--ink); }
 .progress .bar i { display: block; height: 100%; border-radius: 999px; transition: width .6s; }
-/* the book leaves the top of the sky for the carousel */
-.book { top: 46vh; }
 .cost { white-space: nowrap; }
 @media (max-width: 1100px) { .busy .chip > span:last-child:not(.eta) { display: none; } }
 @media (max-width: 760px) {
@@ -354,7 +347,6 @@ body[data-room="hi"] #bubbles { bottom: auto; top: 150px; }
   .toybox .toy-row { flex-wrap: nowrap; overflow-x: auto; }
   .toybox .toy-row button { width: 52px; height: 52px; }
   .fab { bottom: calc(max(10px, env(safe-area-inset-bottom)) + 200px); }
-  .book { top: 120px; }
 }
 .kid-chip { position: relative; }
 .kid-chip.remind::after { content: ''; position: absolute; top: 2px; left: 38px; width: 16px; height: 16px; border-radius: 50%; background: var(--red); border: 3px solid #fff; animation: throb 1.4s infinite; }
@@ -367,8 +359,8 @@ body[data-room="hi"] #bubbles { bottom: auto; top: 150px; }
 .out-link { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 4px 14px 4px 8px; border-radius: 999px; color: var(--ink-2); font-size: 16px; font-weight: 600; text-decoration: none; opacity: .75; }
 .out-link:hover, .out-link:focus-visible { opacity: 1; background: rgba(255,255,255,.6); color: var(--ink); }
 .out-link .ic { width: 20px; height: 20px; }
-.book .out-links { padding-bottom: 24px; }
-.book .out-link { background: rgba(255,248,231,.85); opacity: .9; }
+.book .out-links { padding: 8px 0 4px; }
+.book .out-link { background: rgba(255,255,255,.7); opacity: .9; }
 
 /* a game, not a page: no double-tap zoom, no pinch zoom of the page (the mat pinches on its own), no
  * text selection or callouts from a long press; a stray tap must never strand the player zoomed in */
@@ -449,3 +441,52 @@ button, a, .pill, .round, .chip, .flag { touch-action: manipulation; }
 /* in every side card, what you can press comes before the facts: a short screen scrolls the facts,
  * never the button */
 .panel > .facts { order: 5; }
+
+/* the Book: a board book, one page at a time behind coloured tabs; the carousel rides above it */
+.book { position: fixed; z-index: 6; left: 50%; transform: translateX(-50%); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 112px);
+  width: min(980px, calc(100vw - 32px)); height: clamp(260px, 50dvh, 470px); display: flex; flex-direction: column; pointer-events: auto; }
+.book-tabs { display: flex; gap: 6px; padding: 0 26px; align-items: flex-end; flex: none; }
+.book-tab { width: 62px; height: 50px; border: 0; padding: 0; border-radius: 18px 18px 0 0; background: var(--c); display: grid; place-items: center; cursor: pointer;
+  transform: translateY(8px); transition: transform .2s, height .2s; box-shadow: inset 0 -8px 0 rgba(29,42,92,.08); }
+.book-tab .ic { width: 32px; height: 32px; }
+.book-tab:hover { transform: translateY(2px); }
+.book-tab[aria-selected="true"] { transform: none; height: 60px; box-shadow: none; }
+.book-body { flex: 1; min-height: 0; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 12px;
+  background: var(--c, #FFE08A); border-radius: 34px; box-shadow: 0 10px 0 rgba(29,42,92,.14), 0 18px 40px rgba(29,42,92,.18); }
+.book-leaf { position: relative; height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--cream); border-radius: 26px; padding: 10px 14px 0; transform-origin: center; }
+.book-title { margin: 0 0 8px; display: inline-flex; align-items: center; gap: 10px; font-size: 32px; color: var(--ink); flex: none; }
+.book-title .ic { width: 40px; height: 40px; }
+.book-page { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; display: grid; align-content: start; gap: 12px; padding: 2px 4px 18px; outline: none;
+  scrollbar-width: thin; scrollbar-color: var(--c, #FFC72C) transparent; }
+.book-page .flow { padding: 10px 14px; background: #fff; box-shadow: 0 5px 0 var(--cream-d); }
+.book-page .flow .ic { width: 46px; height: 46px; }
+.book-page .words-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.book-page .wcard { background: #fff; padding: 10px 6px 8px; }
+.book-page .wcard .ic { width: 48px; height: 48px; }
+.book-page .wcard b { font-size: 19px; }
+.book-page .wcard.pulse { animation: book-pulse 1.2s cubic-bezier(.3,1.6,.6,1); }
+@keyframes book-pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 var(--c); } 30% { transform: scale(1.12); box-shadow: 0 0 0 8px var(--c); } 100% { transform: scale(1); box-shadow: 0 6px 0 var(--cream-d); } }
+.book-turn { width: 58px; height: 58px; }
+.book-turn:disabled { opacity: .3; }
+.book-more { position: absolute; left: 50%; bottom: 6px; width: 46px; height: 46px; margin-left: -23px; border-radius: 50%; background: #fff; display: grid; place-items: center; cursor: pointer;
+  box-shadow: 0 4px 0 rgba(29,42,92,.15); opacity: 0; pointer-events: none; transition: opacity .25s; }
+.book-more .ic { transform: rotate(90deg); }
+.book-more.on { opacity: 1; pointer-events: auto; animation: book-bob 1.3s ease-in-out infinite; }
+@keyframes book-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 5px; } }
+@media (max-width: 760px) {
+  .book { width: calc(100vw - 20px); bottom: calc(max(10px, env(safe-area-inset-bottom)) + 84px); height: min(54dvh, calc(100dvh - 300px)); min-height: 280px; }
+  .book-tabs { padding: 0 14px; gap: 4px; }
+  .book-tab { width: 48px; height: 44px; }
+  .book-tab[aria-selected="true"] { height: 52px; }
+  .book-tab .ic { width: 28px; height: 28px; }
+  .book-body { grid-template-columns: 1fr; padding: 8px; border-radius: 28px; }
+  .book-turn { display: none; }
+  .book-title { font-size: 26px; }
+  .book-page .words-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .book-page .flow .ic { width: 38px; height: 38px; }
+  .book-page .flow { gap: 6px; padding: 8px; }
+  .book-page .wcard .eq { flex-wrap: wrap; gap: 2px; }
+  .book-page .wcard .eq .ic { width: 18px; height: 18px; }
+}
+@media (max-height: 620px) and (min-width: 761px) { .book { height: calc(100dvh - 64px - 150px); min-height: 220px; } .book-title { font-size: 24px; margin-bottom: 4px; } .book-title .ic { width: 30px; height: 30px; } }
+@media (prefers-reduced-motion: reduce) { .book-more.on { animation: none; } }
