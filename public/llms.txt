@@ -1,13 +1,13 @@
 # Pip Pop
 
-> Pip Pop (https://pippop.pet) is a free 3D toy-box game that plays in the browser. It is a skin of the Structs blockchain strategy game: every player is a real Structs player, and every action is a real Structs transaction.
+> Pip Pop (https://pippop.pet) is a free 3D toy-box game that plays in the browser. It is a skin of the Structs blockchain strategy game: every player is a real Structs player, and every action is a real Structs transaction. It is a satire for grown-ups dressed as a baby toy, not a game for children.
 
 ## How it plays
 - Open a gift to meet your Bear, the boss toy (a Structs Command Ship).
 - Your play mat (a Structs planet) holds toys on four levels: Moon, Sky, Grass and Tub (space, air, land, water).
 - A Digger digs rocks (ore); a Popper pops rocks into stars (alpha matter). Rocks can be grabbed by others; stars cannot.
 - Fill stars into your club's Fridge (a guild reactor) for juice (energy). Juice lets you make more toys.
-- Roll your wagon (fleet) to another kid's mat, bonk their Bear until it goes poof, and grab their rocks (a raid).
+- Roll your wagon (fleet) to another pet's mat, bonk their Bear until it goes poof, and grab their rocks (a raid).
 - Wind (charge) builds up every tick; each action needs enough of it.
 
 ## Links

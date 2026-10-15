@@ -20,7 +20,7 @@ playtest/pt <you> key <Key> [times]    Tab, Enter, Escape, ArrowDown… (reports
 playtest/pt <you> fill <field> <text>  clear a text field and type into it
 playtest/pt <you> goto <#/route>       like typing an address; goto reload reloads the page
 playtest/pt <you> wait <secs>          let time pass (things grow while you wait); up to 120
-playtest/pt <you> state                the game's own summary of your kid (for checking, not for playing)
+playtest/pt <you> state                the game's own summary of your pet (for checking, not for playing)
 playtest/pt <you> note "[tag] what you saw or felt"
 playtest/pt <you> verdict fun=N clarity=N magic=N feel=N "your summary"
 playtest/pt <you> end

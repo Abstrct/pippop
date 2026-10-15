@@ -22,7 +22,7 @@ export function sky(_ctx: Ctx): Screen {
   const search = h('input', { id: 'kid-find', type: 'search', 'aria-label': 'Name', placeholder: '', autocomplete: 'off', oninput: () => { apply(); } }) as HTMLInputElement;
   const left = h('section', { class: 'card panel left hide-phone stack', 'aria-label': 'Clubs' },
     h('div', { class: 'row nowrap' }, icon('find', 40), h('div', { class: 'field', style: { flex: '1' } }, search)), filters);
-  const card = h('section', { class: 'card panel right toy-card', 'aria-label': 'Kid', hidden: true });
+  const card = h('section', { class: 'card panel right toy-card', 'aria-label': 'Pet', hidden: true });
   const el = h('div', null, left, card);
 
   let all: Kid[] = [], shown: Kid[] = [];

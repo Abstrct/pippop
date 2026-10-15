@@ -73,7 +73,7 @@ export function hi(ctx: Ctx): Screen {
           h('p', { class: 'tap-hint', 'aria-hidden': 'true' }, busy ? '...' : 'Tap!'),
           h('div', { class: 'row center' },
             h('button', { type: 'button', class: 'pill huge red', disabled: busy, onclick: () => void makeNew() }, icon('gift', 52), 'New'),
-            h('button', { type: 'button', class: 'pill big', 'aria-label': 'Words (I have a kid)', onclick: () => { step = 'back'; err = ''; paint(); } }, icon('words', 34), 'Words')),
+            h('button', { type: 'button', class: 'pill big', 'aria-label': 'Words (I have a pet)', onclick: () => { step = 'back'; err = ''; paint(); } }, icon('words', 34), 'Words')),
           h('a', { class: 'pill small sky', href: '#/sky' }, icon('eye', 24), 'Look'));
         break;
       }

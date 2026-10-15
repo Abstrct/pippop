@@ -9,7 +9,7 @@
   "orientation": "any",
   "background_color": "#41B6E6",
   "theme_color": "#E4002B",
-  "categories": ["games", "kids", "entertainment"],
+  "categories": ["games", "strategy", "puzzle", "entertainment"],
   "lang": "en",
   "icons": [
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },

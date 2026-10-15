@@ -68,7 +68,7 @@ export function book(_ctx: Ctx): Screen {
       flow('star', '>', 'fridge', '>', 'juice', '>', 'make'),
       flow('wagon', '>', 'roll', '>', 'bonk+bear', '>', 'grab+rock')] },
     { ic: 'kid', word: 'Things', color: '#9ED8F5', body: () => [grid(
-      w('kid', 'Kid'), w('club', 'Club'), w('mat', 'Mat'), w('wagon', 'Wagon'), w('fridge', 'Fridge'), w('cup', 'Cup'), w('bear', 'Bear', 'heart', '×' + (typeOf(1)?.maxHealth ?? 6)), w('gift', 'Make'))] },
+      w('kid', 'Pet'), w('club', 'Club'), w('mat', 'Mat'), w('wagon', 'Wagon'), w('fridge', 'Fridge'), w('cup', 'Cup'), w('bear', 'Bear', 'heart', '×' + (typeOf(1)?.maxHealth ?? 6)), w('gift', 'Make'))] },
     { ic: 'rock', word: 'Stuff', color: '#FFC08A', body: () => [grid(
       w('star', 'Star', 'lock'), w('rock', 'Rock', 'grab'), w('juice', 'Juice', 'make'), w('wind', 'Wind', 'tick', '>', 'wind'), w('fort', 'Fort', 'grab', 'no'),
       w('heart', 'Heart'), w('tick', 'Tick'), w('key', 'Key'), w('words', 'Words', 'lock'), w('shake', 'Shake', 'tick', '>', 'check'))] },
