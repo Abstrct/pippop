@@ -11,7 +11,7 @@ import { toy, fmtWait } from '../lore';
 
 const NS = 'http://www.w3.org/2000/svg';
 const COL = { red: '#E4002B', sun: '#FFC72C', blue: '#0077C8', leaf: '#43B02A', peach: '#FF8F1C', plum: '#8246AF', sky: '#41B6E6', ink: '#1D2A5C', cream: '#FFF8E7', pink: '#FF8FB1' };
-const ROOMS = new Set(['mat', 'toys', 'sky', 'fridge']);
+const ROOMS = new Set(['mat', 'toys', 'sky', 'fridge', 'bonk']);   // the Bonk room: a grab's hashing runs there
 
 function s<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}, ...kids: SVGElement[]): SVGElementTagNameMap[K] {
   const el = document.createElementNS(NS, tag);

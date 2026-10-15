@@ -12,7 +12,10 @@ export interface BonkUnit { id: string; type: number; realm: Realm; mat: boolean
 export interface BonkStage extends Stage {
   set(ours: BonkUnit[], theirs: BonkUnit[], o: { oursName?: string; theirsName?: string }): void;
   mark(kind: 'a' | 't', id: string | null): void;
-  strike(from: string, to: string, o: { miss?: boolean; mine?: boolean; done?: () => void }): void;
+  /** A bonk from `from` at `to`; with `blocker`, that toy hops in front of `to` and takes the ball. */
+  strike(from: string, to: string, o: { miss?: boolean; mine?: boolean; blocker?: string; done?: () => void }): void;
+  /** A bonk back (a counter): a smaller, quicker ball from a defender to the striker. */
+  counter(from: string, to: string, done?: () => void): void;
   pop(id: string, text: string, tone: 'hit' | 'miss' | 'guard' | 'fell'): void;
   fell(id: string): void;
   anchor(id: string): THREE.Vector3 | null;
@@ -70,6 +73,14 @@ export function bonkStage(on: { pick: (id: string | null) => void; hover?: (id: 
     const out = new Map<string, THREE.Vector3>();
     for (const r of rows.values()) r.forEach((u, i) => out.set(u.id, posFor(u, i, side)));
     return out;
+  }
+
+  /** A hug-shield: a see-through purple bubble that pops up round a blocker and fades. */
+  function shield(at: THREE.Vector3, h: number) {
+    const m = new THREE.Mesh(geo.ball(28), new THREE.MeshPhysicalMaterial({ color: P.plum, transparent: true, opacity: 0.45, roughness: 0.1, clearcoat: 1, depthWrite: false }));
+    m.position.copy(at); group.add(m);
+    const r = Math.max(0.7, h * 0.8);
+    tween(0.7, (k) => { m.scale.setScalar(r * (k < 0.3 ? ease.back(k / 0.3) : 1 + (k - 0.3) * 0.25)); (m.material as THREE.MeshPhysicalMaterial).opacity = 0.45 * (k < 0.5 ? 1 : 1 - (k - 0.5) / 0.5); }, { ease: ease.lin, done: () => { group.remove(m); (m.material as THREE.Material).dispose(); } });
   }
 
   const stage: BonkStage = {
@@ -131,11 +142,21 @@ export function bonkStage(on: { pick: (id: string | null) => void; hover?: (id: 
       else markT = id;
     },
     strike(from, to, o) {
-      const a = toys.get(from), b = toys.get(to);
+      const a = toys.get(from), b = toys.get(to), g = o.blocker ? toys.get(o.blocker) : undefined;
       if (!a || !b) { o.done?.(); return; }
       a.ctl.squash(0.6);
       const p0 = a.ctl.root.position.clone().add(new THREE.Vector3(0, a.ctl.height * 0.7, 0));
-      const p1 = b.ctl.root.position.clone().add(new THREE.Vector3(0, b.ctl.height * 0.55, 0));
+      let p1 = b.ctl.root.position.clone().add(new THREE.Vector3(0, b.ctl.height * 0.55, 0));
+      // the hugging pal: it hops out to a spot just in front of the toy it hugs and catches the ball there
+      let guardBack: (() => void) | null = null;
+      if (g && !o.miss) {
+        const home = g.ctl.root.position.clone(), r = g.ctl.root;
+        const toward = new THREE.Vector3().subVectors(a.ctl.root.position, b.ctl.root.position).setY(0).normalize();
+        const spot = b.ctl.root.position.clone().addScaledVector(toward, 1.1); spot.y = home.y;
+        tween(0.5, (k) => { r.position.lerpVectors(home, spot, k); r.position.y = home.y + Math.sin(k * Math.PI) * 1.1; }, { ease: ease.inOut });
+        p1 = spot.clone().add(new THREE.Vector3(0, g.ctl.height * 0.55, 0));
+        guardBack = () => tween(0.6, (k) => { r.position.lerpVectors(spot, home, k); r.position.y = home.y + Math.sin(k * Math.PI) * 0.8; }, { ease: ease.inOut, delay: 0.35 });
+      }
       const missTo = p1.clone().add(new THREE.Vector3((b.side) * 2.5, 2.5, 1.5));
       const ballM = part(geo.ball(20), plastic(o.mine ? P.sun : P.peach, { glow: 0.25 }), p0.x, p0.y, p0.z, 0.24);
       group.add(ballM);
@@ -143,6 +164,15 @@ export function bonkStage(on: { pick: (id: string | null) => void; hover?: (id: 
       tween(0.75, (k) => { ballM.position.lerpVectors(p0, p1, k); ballM.position.y += Math.sin(k * Math.PI) * arc; ballM.rotation.x = k * 12; }, { ease: ease.lin, done: () => {
         if (o.miss) {
           tween(0.6, (k) => { ballM.position.lerpVectors(p1, missTo, k); ballM.position.y += Math.sin(k * Math.PI) * 1.2; }, { done: () => group.remove(ballM) });
+        } else if (g) {
+          // blocked: the pal takes it behind a purple hug-shield, and the ball bounces off
+          g.ctl.squash(1.3);
+          shield(p1, g.ctl.height);
+          confetti(group, p1, { n: 14, power: 1.6, colors: [P.plum, P.pink, P.white] });
+          world.rumble(0.25);
+          const off = p1.clone().add(new THREE.Vector3(a.side * 1.6, 1.8, 0.8));
+          tween(0.45, (k) => { ballM.position.lerpVectors(p1, off, k); ballM.scale.setScalar(0.24 * (1 - k)); }, { done: () => group.remove(ballM) });
+          guardBack?.();
         } else {
           b.ctl.squash(1.2);
           confetti(group, p1, { n: 18, power: 1.8 });
@@ -150,6 +180,22 @@ export function bonkStage(on: { pick: (id: string | null) => void; hover?: (id: 
           tween(0.25, (k) => ballM.scale.setScalar(0.24 * (1 - k)), { done: () => group.remove(ballM) });
         }
         o.done?.();
+      } });
+    },
+    counter(from, to, done) {
+      const a = toys.get(from), b = toys.get(to);
+      if (!a || !b) { done?.(); return; }
+      a.ctl.squash(0.8);
+      const p0 = a.ctl.root.position.clone().add(new THREE.Vector3(0, a.ctl.height * 0.7, 0));
+      const p1 = b.ctl.root.position.clone().add(new THREE.Vector3(0, b.ctl.height * 0.55, 0));
+      const ballM = part(geo.ball(16), plastic(P.plum, { glow: 0.35 }), p0.x, p0.y, p0.z, 0.17);
+      group.add(ballM);
+      const arc = 1.2 + p0.distanceTo(p1) * 0.08;
+      tween(0.5, (k) => { ballM.position.lerpVectors(p0, p1, k); ballM.position.y += Math.sin(k * Math.PI) * arc; ballM.rotation.z = k * 14; }, { ease: ease.lin, done: () => {
+        b.ctl.squash(1);
+        confetti(group, p1, { n: 10, power: 1.3, colors: [P.plum, P.sun] });
+        tween(0.2, (k) => ballM.scale.setScalar(0.17 * (1 - k)), { done: () => group.remove(ballM) });
+        done?.();
       } });
     },
     pop(id, text, tone) {

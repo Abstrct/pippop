@@ -510,3 +510,6 @@ button, a, .pill, .round, .chip, .flag { touch-action: manipulation; }
 @keyframes dice-tumble { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(1.15); } 100% { transform: rotate(360deg) scale(1); } }
 @media (max-width: 760px) { .strike .row.nowrap .pill.huge { padding: 8px 16px; font-size: 26px; } .strike .row.nowrap .pill.huge .ic { width: 34px; height: 34px; } }
 @media (prefers-reduced-motion: reduce) { .dice-btn.rolling .ic { animation: none; } }
+
+/* in the Bonk room the bubble has the top right, so the busy box sits below it, clear of the Bonk panel */
+@media (min-width: 761px) and (min-height: 621px) { body[data-room="bonk"] .busybox { top: auto; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 112px); width: 240px; } }

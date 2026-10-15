@@ -157,17 +157,24 @@ export function bonk(ctx: Ctx): Screen {
       if (!sh) return;
       const onId = sh.blockerId || sh.targetId;
       // the same bonk again, up close, in a bubble
-      bonkBubble.play({ a: bw.attackerType, b: (sh.blockerId ? sh.blockerType : sh.targetType) || sh.targetType, mine, miss: sh.evaded, guard: !!sh.blockerId,
-        dmg: sh.damage, felled: sh.blockerId ? sh.blockerFelled : sh.targetFelled, back: sh.back + sh.counters.reduce((n, c) => n + c.dmg, 0), aFelled: bw.attackerFelled });
-      stage.strike(bw.attackerId, onId, { miss: sh.evaded, mine, done: () => {
+      bonkBubble.play({ a: bw.attackerType, b: sh.targetType, g: sh.blockerId ? sh.blockerType : undefined, mine, miss: sh.evaded,
+        dmg: sh.damage, felled: sh.blockerId ? sh.blockerFelled : sh.targetFelled, backs: [...sh.counters.filter((c) => c.dmg > 0).map((c) => ({ type: c.type, dmg: c.dmg })), ...(sh.back ? [{ type: sh.targetType, dmg: sh.back }] : [])], aFelled: bw.attackerFelled });
+      // the bonk, a hugging pal jumping in to take it, then every bonk back: defenders' counters and
+      // the target's own, each a ball of its own; knock-outs wait until the last one has landed
+      stage.strike(bw.attackerId, sh.targetId, { miss: sh.evaded, mine, blocker: sh.blockerId, done: () => {
         if (sh.evaded) { stage.pop(sh.targetId, 'Boing!', 'miss'); audio.chime('boing'); }
-        else { stage.pop(onId, sh.damage ? `-${sh.damage}` : 'Bonk!', sh.blockerId ? 'guard' : 'hit'); audio.chime('bonk'); }
-        for (const c of sh.counters) if (c.dmg) setTimeout(() => stage.pop(bw.attackerId, `-${c.dmg}`, 'hit'), 380);
-        if (sh.back) setTimeout(() => stage.pop(bw.attackerId, `-${sh.back}`, 'hit'), 420);
-        const gone = (id: string) => setTimeout(() => { stage.pop(id, 'Poof!', 'fell'); stage.fell(id); audio.chime('pop'); }, 500);
+        else if (sh.blockerId) { stage.pop(sh.blockerId, sh.damage ? `-${sh.damage}` : 'Hug!', 'guard'); audio.chime('hug'); }
+        else { stage.pop(onId, sh.damage ? `-${sh.damage}` : 'Bonk!', 'hit'); audio.chime('bonk'); }
+        const backs = [...sh.counters.filter((c) => c.dmg > 0).map((c) => ({ by: c.by, dmg: c.dmg })), ...(sh.back ? [{ by: sh.targetId, dmg: sh.back }] : [])];
+        backs.forEach((c, i) => setTimeout(() => {
+          if (!el.isConnected) return;
+          stage.counter(c.by, bw.attackerId, () => { stage.pop(bw.attackerId, `-${c.dmg}`, 'hit'); audio.chime('bonk'); });
+        }, 420 + i * 380));
+        const settled = 420 + backs.length * 380 + (backs.length ? 450 : 0);
+        const gone = (id: string, extra = 0) => setTimeout(() => { if (!el.isConnected) return; stage.pop(id, 'Poof!', 'fell'); stage.fell(id); audio.chime('pop'); }, 500 + extra);
         if (sh.targetFelled) gone(sh.targetId);
-        if (sh.blockerFelled && sh.blockerId) gone(sh.blockerId);
-        if (bw.attackerFelled) gone(bw.attackerId);
+        if (sh.blockerFelled && sh.blockerId) gone(sh.blockerId, 350);
+        if (bw.attackerFelled) gone(bw.attackerId, settled);
         if (sh.targetFelled && isWyrm(empire.ownerOf(sh.targetId)?.structs.get(sh.targetId))) setTimeout(() => shout(mine ? 'Bonk!' : 'Uh oh!', 'bear', mine ? 'yay' : 'uh'), 900);
       } });
       if (!mine) bubble('Bonk', 'bonk', 'uh', { toy: toy(bw.attackerType).icon });
