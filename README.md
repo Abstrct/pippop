@@ -2,7 +2,7 @@
 
 *Dig. Pop. Bonk!*
 
-A toy box that plays the real [Structs](https://structs.ai) network. Every kid you meet is a real player, and most of them see a starship game, not a teddy bear. Everything is drawn live in three.js with chunky plastic, primary colours and a music box. The page never shows a sentence, only symbols and single words.
+A toy box that plays the real [Structs](https://structs.ai) network. Every pet you meet is a real player, and most of them see a starship game, not a teddy bear. Everything is drawn live in three.js with chunky plastic, primary colours and a music box. The page never shows a sentence, only symbols and single words.
 
 ```bash
 pnpm install
@@ -38,10 +38,10 @@ Links to [Structs](https://playstructs.com) and its [technical documentation](ht
 | Symbol | Room | What it does on the chain |
 |---|---|---|
 | gift | **Hi** `#/hi` | makes a key in this browser, shows the magic words, joins a club (guild signup), finds a mat (`MsgPlanetExplore`) |
-| mat | **Mat** `#/` · `#/mat/<kid>` | your planet: tap a toy for Wake / Nap / Hide / Peek / Hug / Free / Feed / Toss, the Bear's Hop, Find a new mat |
+| mat | **Mat** `#/` · `#/mat/<pet>` | your planet: tap a toy for Wake / Nap / Hide / Peek / Hug / Free / Feed / Toss, the Bear's Hop, Find a new mat |
 | blocks | **Toys** `#/toys/<type>` | the shelf: every struct type as symbols; Make (`MsgStructBuildInitiate`) |
-| mobile | **Sky** `#/sky` | every kid hanging from a crib mobile in their club's colour; Peek, Roll (`MsgFleetMove`) |
-| mallet | **Bonk** `#/bonk/<kid>` | Roll › bonk their Bear › Grab. Odds from the chain's own combat rules; `MsgStructAttack` |
+| mobile | **Sky** `#/sky` | every pet hanging from a crib mobile in their club's colour; Peek, Roll (`MsgFleetMove`) |
+| mallet | **Bonk** `#/bonk/<pet>` | Roll › bonk their Bear › Grab. Odds from the chain's own combat rules; `MsgStructAttack` |
 | fridge | **Fridge** `#/fridge` | every club's juice jar (reactor); Fill / Take (`MsgReactorInfuse` / `Defuse`) |
 | book | **Book** `#/book` | the picture dictionary, with all 22 toys on a carousel |
 
@@ -51,7 +51,7 @@ Shakes (proofs of work for Make, Dig, Pop and Grab) run on Web Workers and WebGP
 
 | Pip Pop | Structs |
 |---|---|
-| Kid · Club · Mat · Wagon | Player · Guild · Planet · Fleet |
+| Pet · Club · Mat · Wagon | Player · Guild · Planet · Fleet |
 | Go toy / Mat toy | Fleet struct / Planet struct |
 | Star · Rock · Juice · Wind · Fort · Tick | Alpha Matter · Ore · Energy · Charge · Planetary shield · Block |
 | Fridge · Cup · Fill · Take | Reactor · Substation · Reactor infuse · Reactor defuse |
@@ -77,6 +77,6 @@ Everything else is new: the three.js world (`src/world/*`: 22 procedural toys, t
 STRUCTSD=/path/to/structsd-v0.21.0 bash devnet/setup.sh all
 ```
 
-Then start the `pippop-devnet` entry in `.claude/launch.json` (port 5198). From Pip Pop's own UI, all of these landed and were read back from the chain: a new key and club signup (`MsgGuildMembershipJoinProxy` through the guild), finding a mat, making a Digger (build initiate, then the in-browser shake finishing it), the Bear hopping Moon → Grass, rolling the wagon to another kid, three bonks (the third poofed their Bear; damage and counter-blows matched the shown odds), the grab landing by itself (`MsgPlanetRaidComplete`, height 460, code 0), and filling a star into the club's fridge (juice cap 24K → 25K).
+Then start the `pippop-devnet` entry in `.claude/launch.json` (port 5198). From Pip Pop's own UI, all of these landed and were read back from the chain: a new key and club signup (`MsgGuildMembershipJoinProxy` through the guild), finding a mat, making a Digger (build initiate, then the in-browser shake finishing it), the Bear hopping Moon → Grass, rolling the wagon to another pet, three bonks (the third poofed their Bear; damage and counter-blows matched the shown odds), the grab landing by itself (`MsgPlanetRaidComplete`, height 460, code 0), and filling a star into the club's fridge (juice cap 24K → 25K).
 
 Keys never leave the tab: the key is sealed with a non-extractable device key in IndexedDB, exactly as in Wyrmhold and the Command Deck.

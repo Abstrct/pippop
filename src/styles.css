@@ -504,3 +504,9 @@ button, a, .pill, .round, .chip, .flag { touch-action: manipulation; }
 }
 @media (max-height: 620px) and (min-width: 761px) { .book { height: calc(100dvh - 64px - 130px); min-height: 220px; } .book-title { font-size: 24px; margin-bottom: 4px; } .book-title .ic { width: 30px; height: 30px; } }
 @media (prefers-reduced-motion: reduce) { .book-more.on, .wcard.wiggle-once, .book-page .wcard.pulse { animation: none; } }
+
+/* the Bonk dice: it tumbles while it picks somebody */
+.dice-btn.rolling .ic { animation: dice-tumble .45s linear infinite; }
+@keyframes dice-tumble { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(1.15); } 100% { transform: rotate(360deg) scale(1); } }
+@media (max-width: 760px) { .strike .row.nowrap .pill.huge { padding: 8px 16px; font-size: 26px; } .strike .row.nowrap .pill.huge .ic { width: 34px; height: 34px; } }
+@media (prefers-reduced-motion: reduce) { .dice-btn.rolling .ic { animation: none; } }

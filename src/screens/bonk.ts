@@ -18,7 +18,7 @@ import { pow } from '../pow/pow';
 import { typeOf, type Ambit } from '../data/catalogue';
 import { audio } from '../core/audio';
 import { REALM_OF_AMBIT, kidName, oops, toy } from '../lore';
-import { raidersAt, realmOf, skyFull } from '../realm';
+import { luckyKid, raidersAt, realmOf, skyFull } from '../realm';
 import { alive, forecast, isWyrm, moves, reach, readBlow, wardKeeper, wisest, wyrmOf, type Blow, type Move } from '../game/war';
 import type { Ctx, Screen } from './types';
 
@@ -225,12 +225,33 @@ export function bonk(ctx: Ctx): Screen {
     if (f) side.append(row(kidName(f), 'kid', theirs(f), chooseT, mark));
     side.hidden = !p && !f;
   }
+  /** The dice: somebody at random to bonk (see luckyKid), then their bonk page. */
+  let dicing = false;
+  async function lucky() {
+    const p = me();
+    if (!p || dicing) return;
+    dicing = true; paintStrike(); audio.chime('shake');
+    const t0 = Date.now();
+    try {
+      const id = await luckyKid(p);
+      await new Promise((r) => setTimeout(r, Math.max(0, 900 - (Date.now() - t0))));   // let the dice tumble a moment
+      if (!el.isConnected) return;
+      if (!id) { bubble('Empty', 'empty', 'uh'); return; }
+      audio.chime('boing');
+      ctx.go(`#/bonk/${id}`);
+    } catch { if (el.isConnected) bubble('Slow', 'slow', 'uh', { action: { label: 'Again', icon: 'dice', run: () => void lucky() } }); }
+    finally { dicing = false; if (el.isConnected) paintStrike(); }
+  }
   function paintStrike() { const t = h('div'); buildStrike(t); morph(strikeBox, t); }
   function buildStrike(strike: HTMLElement) {
     const p = me(), f = foe();
     if (!p) { strike.append(h('a', { class: 'pill huge red', href: '#/hi' }, icon('gift', 44), 'Play')); return; }
     if (!f) {
-      strike.append(h('div', { class: 'row center' }, icon('sky', 56), h('span', { class: 'big-word' }, '?')), h('a', { class: 'pill huge blue wiggle', href: '#/sky' }, icon('sky', 44), 'Sky'));
+      // nobody yet: go pick somebody in the Sky, or roll the dice for anybody
+      strike.append(h('div', { class: 'row center' }, icon('bonk', 56), h('span', { class: 'big-word' }, '?')),
+        h('div', { class: 'row center nowrap' },
+          h('a', { class: 'pill huge blue', href: '#/sky' }, icon('sky', 44), 'Sky'),
+          h('button', { type: 'button', class: 'pill huge peach dice-btn' + (dicing ? ' rolling' : ' wiggle'), disabled: dicing, 'aria-label': 'Dice', onclick: lucky }, icon('dice', 44), 'Dice')));
       if (target) strike.prepend(h('span', { class: 'state' }, h('span', { class: 'spin' }, icon('tick', 26)), '...'));
       return;
     }

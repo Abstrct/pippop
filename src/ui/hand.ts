@@ -94,7 +94,7 @@ export function mountGuide() {
         const sp = at ? onScreen(world.toScreen(at as never)) : null;
         return sp ? { x: sp.x, y: sp.y, key: 'sky-mat' } : null;
       }
-      case 'bonk': return first('.strike .bonk-btn:not([disabled])', '.strike .pill.huge');
+      case 'bonk': return first('.strike .bonk-btn:not([disabled])', '.strike .dice-btn:not([disabled])', '.strike .pill.huge');
       case 'fridge': return first('.toy-card .acts .pill.sun', '.panel.left .pill.wiggle');
       default: return null;
     }

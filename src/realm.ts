@@ -5,6 +5,7 @@ import type { OwnedStruct, PlayerState } from './game/empire';
 import { reservedSlots } from './game/actions';
 import { AMBIT_FLAG, AMBITS, typeOf, type Ambit, type StructType } from './data/catalogue';
 import { REALM_OF_AMBIT, type Realm } from './lore';
+import { live } from './chain/live';
 import { dataGuild, gget, kidReady, type GGrid, type GPlayer, type GPlayerFull, type GRoster, type GStruct, type GFleet } from './guild/data';
 
 
@@ -144,6 +145,34 @@ export async function kidsFromGuild(): Promise<{ list: Kid[]; seen: Map<string, 
   for (const g of last) at(g.object_id).lastAction = Number(g.val) || 0;
   const list = players.filter((p) => p.planet_id).map((p) => ({ id: p.id, name: names.get(p.id) || '', guildId: p.guild_id || '', planetId: p.planet_id, fleetId: p.fleet_id, address: p.primary_address }));
   return { list, seen };
+}
+
+/** Somebody to bonk, picked at random: never you, not your own club while there is anybody else,
+ * never a mat whose sky is full (the ledger would refuse the roll). Rocks lying out make a bonk worth it and a sleepy kid
+ * bonks back less, so both make a pick likelier; anybody can come up. Null when nobody can. */
+export async function luckyKid(me: PlayerState): Promise<string | null> {
+  const fast = await kidsFromGuild().catch(() => null);
+  const list = fast ? fast.list : await kids();
+  const seen = fast ? fast.seen : await sight().catch(() => new Map<string, Sight>());
+  const others = list.filter((k) => k.id !== me.playerId && k.planetId && k.planetId !== me.planetId);
+  const outsiders = others.filter((k) => !me.guildId || k.guildId !== me.guildId);
+  const pool = outsiders.length ? outsiders : others;   // your own club only when there is nobody else
+  const h = live.height;
+  const weight = (k: Kid) => {
+    const s = seen.get(k.id);
+    const asleep = !!s && h > 0 && s.lastAction > 0 && h - s.lastAction > 600;
+    return 1 + Math.min(s?.ore ?? 0, 20) * 2 + (asleep ? 3 : 0);
+  };
+  // draw without putting back, by weight, and keep the first whose sky has room
+  const bag = pool.map((k) => ({ k, w: weight(k) }));
+  for (let tries = 0; tries < 6 && bag.length; tries++) {
+    let r = Math.random() * bag.reduce((a, x) => a + x.w, 0), i = 0;
+    while (i < bag.length - 1 && (r -= bag[i].w) > 0) i++;
+    const { k } = bag.splice(i, 1)[0];
+    const mat = await lcd.planet(k.planetId).catch(() => null);
+    if (mat && !skyFull(mat, { planetId: me.planetId, fleet: me.fleet ?? null })) return k.id;
+  }
+  return null;
 }
 
 /** One kid at a glance for their card: Bear hearts, wagon away or home, rocks lying out. */
