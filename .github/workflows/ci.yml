@@ -1,5 +1,6 @@
 # Check every pull request and every push to main: typecheck, build twice (at a domain's root and under
-# a project path), then open every room in headless Chrome against the live testnet.
+# a project path), then open every room in headless Chrome, and in headless Firefox, against the live
+# testnet.
 # The deploy (pages.yml) runs on its own and repeats the typecheck and build; a red smoke test does not
 # block it, because the smoke test depends on the public testnet being up.
 name: CI
@@ -32,6 +33,9 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: The two proof-of-work kernels agree (WebAssembly = JavaScript = @noble/hashes)
+        run: pnpm check:hash
 
       - name: Build (domain root, https://pippop.pet)
         run: pnpm build
@@ -78,3 +82,35 @@ jobs:
           name: smoke-shots
           path: smoke-shots
           retention-days: 7
+
+  # The same rooms in Firefox (preinstalled on the runner; driven through its built-in WebDriver BiDi).
+  # Not blocking yet: a runner has no GPU, and Firefox's software WebGL there is still being proven.
+  smoke-firefox:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: firefox --version
+
+      - name: Every room, desktop and phone, in Firefox
+        run: pnpm smoke:firefox
+        env:
+          SMOKE_SHOTS: smoke-shots/firefox
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: smoke-shots-firefox
+          path: smoke-shots
+          retention-days: 7
+

@@ -271,7 +271,40 @@ class World {
     const offY = Math.round((this.inset.bottom - this.inset.top) / 2);
     if (this.frameX || offY) this.camera.setViewOffset(this.canvas.clientWidth, this.canvas.clientHeight, this.frameX, offY, this.canvas.clientWidth, this.canvas.clientHeight);
     else if (this.camera.view?.enabled) this.camera.clearViewOffset();
+    this.govern();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /* ── keeping it smooth: when frames start to drop (a slower browser, a small phone, a busy room)
+   * the shadows are redrawn every third frame instead of every frame, and if that is not enough the
+   * picture is drawn a little smaller; when all is smooth again it steps back up. ── */
+  private quality = 0;
+  private qAt = performance.now();
+  private qFrames = 0;
+  private qSlow = 0;
+  private qLast = performance.now();
+  private qTick = 0;
+  private qGood = 0;
+  private govern() {
+    const now = performance.now(), dt = now - this.qLast; this.qLast = now;
+    if (document.hidden || dt > 250) { this.qAt = now; this.qFrames = this.qSlow = 0; return; }   // a hidden tab or a stall is not a slow frame
+    this.qFrames++; if (dt > 22) this.qSlow++;
+    const r = this.renderer;
+    if (this.quality > 0) { r.shadowMap.autoUpdate = false; if (++this.qTick % 3 === 0) r.shadowMap.needsUpdate = true; }
+    if (now - this.qAt < 2500) return;
+    const slow = this.qSlow / Math.max(1, this.qFrames);
+    const was = this.quality;
+    // down quickly, up slowly (four smooth windows in a row), so it never flickers between the two
+    this.qGood = slow < 0.02 ? this.qGood + 1 : 0;
+    if (slow > 0.12 && this.quality < 2) this.quality++;
+    else if (this.qGood >= 4 && this.quality > 0) { this.quality--; this.qGood = 0; }
+    if (this.quality !== was) {
+      if (this.quality === 0) { r.shadowMap.autoUpdate = true; }
+      const full = Math.min(2, window.devicePixelRatio || 1);
+      r.setPixelRatio(this.quality >= 2 ? Math.max(1, full * 0.75) : full);
+      this.resize();
+    }
+    this.qAt = now; this.qFrames = this.qSlow = 0;
   }
   /** A narrow (portrait) screen backs the camera off so the stage fits across. */
   /** How much further back the camera stands so the stage's width fits across this screen. */

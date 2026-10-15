@@ -11,6 +11,9 @@
     "start": "node serve.mjs",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.mjs",
+    "smoke:firefox": "SMOKE_BROWSER=firefox node scripts/smoke.mjs",
+    "bench": "node scripts/bench.mjs",
+    "check:hash": "node scripts/hashcheck.mts",
     "brand": "node scripts/brand.mjs"
   },
   "dependencies": {

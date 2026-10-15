@@ -126,7 +126,7 @@ export function book(_ctx: Ctx): Screen {
   }
   page.addEventListener('scroll', hint, { passive: true });
   // a wheel anywhere on the book (its title, its edges, its footer) scrolls the page
-  el.addEventListener('wheel', (e) => { if (page.contains(e.target as Node)) return; e.preventDefault(); page.scrollBy({ top: e.deltaY }); }, { passive: false });
+  el.addEventListener('wheel', (e) => { if (page.contains(e.target as Node)) return; e.preventDefault(); page.scrollBy({ top: e.deltaY * (e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? page.clientHeight : 1) }); }, { passive: false });   // Firefox counts a wheel in lines
   more.addEventListener('click', () => { if (more.classList.contains('up')) page.scrollTo({ top: 0, behavior: 'smooth' }); else page.scrollBy({ top: page.clientHeight * 0.8, behavior: 'smooth' }); });
   // swipe a page to turn it
   let sx = 0, sy = 0, st = 0;

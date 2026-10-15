@@ -4,13 +4,14 @@ How pippop.pet is checked and shipped. Two workflows in `.github/workflows/`, no
 
 | Workflow | File | Runs on | Does |
 |---|---|---|---|
-| **CI** | `ci.yml` | every PR, push to `main`, by hand | Typecheck, two builds, then the smoke test |
+| **CI** | `ci.yml` | every PR, push to `main`, by hand | Typecheck, hash-kernel check, two builds, then the smoke test in Chrome (and, not blocking yet, in Firefox) |
 | **Deploy to GitHub Pages** | `pages.yml` | push to `main`, by hand | Build with repository variables, publish `dist/` to Pages |
 
 They run independently: **the deploy doesn't wait for CI**. A failing smoke job doesn't block a release, because the smoke test depends on the public testnet being up. A build that doesn't typecheck can't deploy, because `pnpm build` typechecks first.
 
 ```
-push to main ──┬─► CI ── check (typecheck, root build, project-path build) ──► smoke (every room, headless Chrome vs. live testnet)
+push to main ──┬─► CI ── check (typecheck, hash kernels, root build, project-path build) ──┬─► smoke (every room, headless Chrome vs. live testnet)
+               │                                                                    └─► smoke-firefox (the same, headless Firefox; not blocking)
                │
                └─► Pages ── build (typecheck + vite build) ──► deploy-pages
 ```
@@ -77,6 +78,7 @@ concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
 | Step | What |
 |---|---|
 | `pnpm typecheck` | `tsc` over `src/` |
+| `pnpm check:hash` | The WebAssembly proof-of-work kernel (`src/pow/wasm.ts`) and the JavaScript one (`src/pow/sha.ts`) agree hash for hash, and with `@noble/hashes` |
 | `pnpm build` | Root build (pippop.pet) |
 | Build under a project path | `VITE_SITE_URL=https://example.github.io/pippop pnpm build`, then asserts `dist/404.html`, a base-prefixed manifest link and the sitemap address in `robots.txt` |
 
@@ -96,6 +98,10 @@ concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
 - sideways scroll;
 - a blank 3D view;
 - under a project path, **any request outside the base path** (a hard-coded root path).
+
+### `smoke-firefox` (30 min, after `check`, not blocking)
+
+`pnpm smoke:firefox`: the same rooms in the runner's preinstalled Firefox, driven through Firefox's built-in WebDriver BiDi (`playtest/lib/bidi.mjs`; no geckodriver). It is marked `continue-on-error` until Firefox's software WebGL on a GPU-less runner has proven steady.
 
 It depends on the public testnet, so it can go red when the testnet is down. Without Chrome it skips, and with `CI` set a skip counts as a failure. Screenshots of a failed run are under **Artifacts → smoke-shots**.
 
@@ -141,6 +147,7 @@ A two-stage `Dockerfile`: `node:24-slim` runs `pnpm build`, then `node:24-alpine
 |---|---|---|
 | Share card and icons (`public/og.png`, `public/icon-*.png`) | Locally: `LAB_GPU=1 pnpm brand` (needs `pnpm dev` running); results are committed | A real GPU makes the good-looking shot |
 | Playtests (`playtest/`) | Locally: the lab and its playtesters | Needs the private devnet, and judgment |
+| Browser bench (`pnpm bench`) | Locally, on a machine with a GPU | Chrome and Firefox side by side on the built site: time to first room, frames per second and p95 frame time in every room, proof-of-work hashing speed, and the features the game leans on. Writes `.smoke/bench.json` |
 | Devnet end-to-end (`devnet/`) | Locally | Needs a `structsd` binary and a private chain |
 
 ## 7. Reproducing CI on your machine
@@ -149,6 +156,8 @@ A two-stage `Dockerfile`: `node:24-slim` runs `pnpm build`, then `node:24-alpine
 pnpm install --frozen-lockfile
 pnpm typecheck && pnpm build
 VITE_SITE_URL=https://example.github.io/pippop pnpm build     # project-path build
+pnpm check:hash
 pnpm smoke                                                   # needs Chrome and the testnet
+pnpm smoke:firefox                                           # needs Firefox and the testnet
 SMOKE_QUICK=1 SMOKE_SITE=https://example.github.io/pippop pnpm smoke
 ```
