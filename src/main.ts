@@ -59,6 +59,8 @@ async function route() {
   document.body.dataset.room = r.name || 'mat';
   try {
     current = make({ param: r.param, go: (p) => { if (location.hash === p) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = p; } });
+    // analytics (only a pippop.pet build carries the tag): every room counts as a page of its own
+    (window as unknown as { gtag?: (...a: unknown[]) => void }).gtag?.('event', 'page_view', { page_title: `Pip Pop · ${current?.title || r.name || 'Mat'}`, page_location: location.href, page_path: location.pathname + location.hash });
   } catch (e) {
     // a room that will not open never strands you: say so, and stay in the sky
     console.error('[pippop] room failed', e);

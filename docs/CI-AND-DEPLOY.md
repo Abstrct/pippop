@@ -62,6 +62,7 @@ These are baked into the bundle; changing one means rebuilding. Empty counts as 
 | `VITE_RPC_WS_URL` | `wss://public.testnet.structs.network:26657/websocket` | Live blocks |
 | `VITE_DEFAULT_GUILD` | `0-5` | The club suggested first at sign-up |
 | `VITE_RELAY_URL` | unset: direct in a build, the dev server's relay under `vite` | `off`, `/`, or a standalone relay's URL (see `src/guild/relay.ts`) |
+| `VITE_GA_ID` | `G-4F21XWVQV0` for a pippop.pet build; nothing for any other site | Google Analytics measurement id, or `off`. Only builds carry the tag (never `vite` dev); each room is counted as its own page |
 
 ---
 

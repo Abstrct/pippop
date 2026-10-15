@@ -51,6 +51,7 @@ jobs:
           VITE_RPC_WS_URL: ${{ vars.VITE_RPC_WS_URL }}
           VITE_DEFAULT_GUILD: ${{ vars.VITE_DEFAULT_GUILD }}
           VITE_RELAY_URL: ${{ vars.VITE_RELAY_URL }}
+          VITE_GA_ID: ${{ vars.VITE_GA_ID }}
 
       - uses: actions/upload-pages-artifact@v5
         with:
