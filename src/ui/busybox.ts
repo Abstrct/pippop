@@ -7,7 +7,7 @@ import { pow, type PowTask } from '../pow/pow';
 import { empire } from '../game/empire';
 import { audio } from '../core/audio';
 import { icon, iconSvg } from './icons';
-import { toy, fmtWait } from '../lore';
+import { toy } from '../lore';
 
 const NS = 'http://www.w3.org/2000/svg';
 const COL = { red: '#E4002B', sun: '#FFC72C', blue: '#0077C8', leaf: '#43B02A', peach: '#FF8F1C', plum: '#8246AF', sky: '#41B6E6', ink: '#1D2A5C', cream: '#FFF8E7', pink: '#FF8FB1' };
@@ -272,7 +272,7 @@ export function mountBusyBox() {
     tab.classList.toggle('fast', pow.boosting);
     const c = 2 * Math.PI * 44;
     ring.setAttribute('stroke-dashoffset', String(c * (1 - soon.e.frac)));
-    wait.textContent = fmtWait(soon.e.secs);
+    wait.textContent = pow.say(soon.t);
     tab.style.setProperty('--f', String(soon.e.frac));
     tab.dataset.n = tasks.length > 1 ? String(tasks.length) : '';
     paintSpark();

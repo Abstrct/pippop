@@ -16,6 +16,7 @@ import { GpuHasher } from './gpu';
 import { safeEach } from '../core/util';
 import { leader } from '../core/leader';
 import { num } from '../chain/lcd';
+import { fmtWait } from '../lore';
 
 export type TaskKind = 'build' | 'mine' | 'refine' | 'raid';
 export type TaskStatus = 'idle' | 'hashing' | 'submitting' | 'done' | 'failed';
@@ -151,12 +152,24 @@ class PowEngine {
     const h = live.height;
     if (!h) return { secs: Infinity, frac: 0 };
     const need = this.required(t), best = t.best?.zeros ?? 0;
+    if (t.waits === 'juice') return { secs: Infinity, frac: Math.max(0.03, Math.min(0.97, best >= need ? 0.97 : (h - t.blockStart) / Math.max(1, h - t.blockStart + this.blocksUntil(t, Math.max(this.settings.startAt, best))))) };
     if (t.status === 'submitting' || best >= need) return { secs: 0, frac: 1 };
-    const pace = this.steady || this.settings.threads * 2.5e6;
-    const z = Math.max(this.settings.startAt, Math.floor(Math.log(pace * 300) / Math.log(16)), best);
-    const blocks = this.blocksUntil(t, z);
-    const hashing = need <= z ? Math.min(600, this.etaSeconds(need, pace)) : 0;
-    const raw = blocks * live.blockTime + hashing;
+    // Hashing begins once the bar is down to what this machine can reach (the same rule the scheduler
+    // uses), and the bar keeps falling while it hashes. So: for each bar it could be won at, the wait
+    // for the bar to fall that far plus the hashing expected there; the soonest is the answer.
+    const pace = this.pace();
+    const start = Math.max(this.settings.startAt, this.reachableAt(pace), best);
+    let raw = Infinity, blocks = 0;
+    for (let z = Math.min(need, start); z >= 1; z--) {
+      const b = this.blocksUntil(t, z);
+      if (!Number.isFinite(b)) continue;
+      const wait = b * live.blockTime;
+      if (wait >= raw) break;                       // lower bars only come later
+      const total = wait + (best >= z ? 0 : this.etaSeconds(z, pace));
+      if (total < raw) { raw = total; blocks = b; }
+    }
+    if (!Number.isFinite(raw)) raw = Math.min(6 * 3600, this.etaSeconds(need, pace));
+    const hashing = raw - blocks * live.blockTime > 1;
     // a time only ever counts down smoothly: good news shows at once, bad news creeps in
     const now = performance.now(), was = this.shown.get(t.id);
     let secs = raw;
@@ -172,6 +185,9 @@ class PowEngine {
     const frac = Math.max(0.03, Math.min(0.97, (h - t.blockStart) / total - (hashing ? 0.05 : 0)));
     return { secs, frac };
   }
+
+  /** What a player reads for a task: its time left, or 'Juice' while it waits for juice. */
+  say(t: PowTask): string { return t.waits === 'juice' ? 'Juice' : fmtWait(this.eta(t).secs); }
 
   /** Expected seconds for a thread pool at `rate` to find `zeros` leading zeros. */
   etaSeconds(zeros: number, rate = this.rate || 1) { return Math.pow(16, zeros) / Math.max(1, rate); }
@@ -235,7 +251,7 @@ class PowEngine {
     const owners = new Set([...this.tasks.values()].filter((t) => t.kind === 'raid' && seen.has(t.id) && t.owner).map((t) => t.owner!));
     for (const o of owners) if (!this.raidWatch.has(o)) { this.raidWatch.add(o); empire.watch(o); }
     for (const o of [...this.raidWatch]) if (!owners.has(o)) { this.raidWatch.delete(o); empire.unwatch(o); }
-    for (const t of this.tasks.values()) t.waits = raidWaits(t);
+    for (const t of this.tasks.values()) t.waits = waitsOf(t);
     // A task whose condition went away (built, clock reset, raid over) retires.
     for (const [id, t] of this.tasks) {
       if (!seen.has(id) && t.status !== 'submitting') {
@@ -253,7 +269,7 @@ class PowEngine {
   private tick() {
     for (const t of this.tasks.values()) {
       if (t.status === 'done' || t.status === 'submitting' || !t.best) continue;
-      t.waits = raidWaits(t);
+      t.waits = waitsOf(t);
       if (leader.isLeader && t.best.zeros >= this.required(t) && this.settings.autoSubmit && !(t.holdUntil && live.height < t.holdUntil) && !t.waits) this.submit(t);
     }
     this.schedule();
@@ -335,10 +351,15 @@ class PowEngine {
     }
   }
 
-  /** Zeros the pool can expect to find within about five minutes. */
+  /** This machine's ordinary hashing pace (hashes a second): what it has managed lately when not
+   * boosted, else what it is doing now, else a guess from its thread count. The scheduler and the
+   * times a player sees both reckon from it, so they always agree on when hashing begins. */
+  pace(): number { return this.steady || this.rate || this.settings.threads * 2.5e6; }
+  /** Zeros a pool at `rate` can expect to find within about five minutes. */
+  private reachableAt(rate: number): number { return Math.floor(Math.log(Math.max(1, rate) * 300) / Math.log(16)); }
+  /** Zeros the pool can expect to find within about five minutes (a boost reaches a little further). */
   private reachable(): number {
-    const r = this.rate || this.settings.threads * 2.5e6;
-    return Math.floor(Math.log(r * 300) / Math.log(16));
+    return this.reachableAt(this.boosting ? Math.max(this.rate, this.pace()) : this.pace());
   }
 
   private release(id: string) {
@@ -389,7 +410,7 @@ class PowEngine {
   private found(t: PowTask, zeros: number, nonce: string, hash: string) {
     if (t.best && zeros <= t.best.zeros) return;
     t.best = { zeros, nonce, hash };
-    t.waits = raidWaits(t);
+    t.waits = waitsOf(t);
     if (leader.isLeader && t.status !== 'submitting' && t.status !== 'done' && zeros >= this.required(t) && this.settings.autoSubmit && !(t.holdUntil && live.height < t.holdUntil) && !t.waits) this.submit(t);
     this.emit();
   }
@@ -463,6 +484,15 @@ function tasksFor(p: PlayerState, signer?: number): PowTask[] {
   }
   if (signer != null && p.account < 0) for (const t of out) t.label = `${p.name}: ${t.label}`;
   return out;
+}
+
+/** Why a ripe proof is not being sent yet: their Bear still guards (a raid), or the owner has no juice.
+ * An owner whose load is over their capacity is offline, and the ledger refuses every finish then
+ * (build, dig, pop, grab alike); sending would only fail, so the proof is kept until juice is back. */
+export function waitsOf(t: PowTask): string | undefined {
+  const owner = empire.players.get(t.playerId);
+  if (owner && !owner.online) return 'juice';
+  return raidWaits(t);
 }
 
 /** The ledger refuses a plunder while the isle's owner has an Elder Wyrm awake at home (their

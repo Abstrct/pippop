@@ -8,7 +8,7 @@ import { txq } from '../wallet/queue';
 import { pow, type PowTask } from '../pow/pow';
 import { live } from '../chain/live';
 import { audio } from '../core/audio';
-import { fmtStars, fmtJuice, fmtWait, juice, kidName, short, toy, verbOf, clubColor, oops } from '../lore';
+import { fmtStars, fmtJuice, juice, kidName, short, toy, verbOf, clubColor, oops } from '../lore';
 import { typeOf } from '../data/catalogue';
 import { openMe } from './me';
 
@@ -117,16 +117,16 @@ export function mountHud(root: HTMLElement) {
     for (const t of tasks.slice(0, 5)) {
       const e = pow.eta(t);
       const tId = toyOfTask(t);
-      const label = `${verbWord(t.kind)} ${tId ? toy(tId).word : ''} ${fmtWait(e.secs)}`;
-      keep('pow:' + t.id, [t.kind, tId, !!t.waits].join('|'),
+      const label = `${verbWord(t.kind)} ${tId ? toy(tId).word : ''} ${pow.say(t)}`;
+      keep('pow:' + t.id, [t.kind, tId, t.waits || ''].join('|'),
         () => h('div', { class: 'chip' + (t.waits ? ' wait' : ''), role: 'img' },
           ring(e.frac),
           h('span', { class: 'shaker' }, icon('shake', 28)),
           icon(KIND_ICON[t.kind], 28), tId ? icon(toy(tId).icon, 28) : null,
-          t.waits ? icon('bear', 24) : h('span', { class: 'eta' }, '')),
+          t.waits ? icon(t.waits === 'juice' ? 'juice' : 'bear', 24) : h('span', { class: 'eta' }, '')),
         (el) => {
           setRing(el.querySelector('svg.ring'), e.frac);
-          const eta = el.querySelector('.eta'); const w = fmtWait(e.secs);
+          const eta = el.querySelector('.eta'); const w = pow.say(t);
           if (eta && eta.textContent !== w) eta.textContent = w;
           if (el.getAttribute('aria-label') !== label) el.setAttribute('aria-label', label);
         }, order);

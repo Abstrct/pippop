@@ -14,7 +14,7 @@ import { live } from '../chain/live';
 import { num } from '../chain/lcd';
 import { typeOf } from '../data/catalogue';
 import { audio } from '../core/audio';
-import { AMBIT_OF_REALM, REALMS, REALM_COLOR, REALM_NAME, TRICK_ICON, WARD_CRAFT, clubColor, fmtStars, fmtWait, kidName, oops, reachOf, short, toy } from '../lore';
+import { AMBIT_OF_REALM, REALMS, REALM_COLOR, REALM_NAME, TRICK_ICON, WARD_CRAFT, clubColor, fmtStars, kidName, oops, reachOf, short, toy } from '../lore';
 import { pow, type PowTask } from '../pow/pow';
 import { owned, raidersAt, realmOf, unitsOf } from '../realm';
 import type { Ctx, Screen } from './types';
@@ -116,7 +116,8 @@ export function mat(ctx: Ctx): Screen {
       if (me) sign('uh', 'bear', 'Bear', ['Make', 'make', () => { const t = typeOf(1); if (t) rite(p, () => act.build(p, t, 'land', 0), false); }]);
       else if (p.ore > 0) sign('yay', 'bear', 'Gone', ['Bonk', 'bonk', () => ctx.go(`#/bonk/${p.playerId}`)]);
     }
-    if (!p.online) sign('uh', 'juice', 'Juice');
+    // no juice: nothing can finish until there is more (fill stars into the club's Fridge, or nap a toy)
+    if (!p.online) sign('uh', 'juice', 'Juice', ['Fridge', 'fridge', () => ctx.go('#/fridge')]);
     if (p.ore > 0) {
       if (me) {
         const popping = p.online && [...p.structs.values()].some((x) => x.typeId === 15 && !x.destroyed && x.built && x.online && x.locationId === p.planetId);
@@ -169,7 +170,7 @@ export function mat(ctx: Ctx): Screen {
     if (shake) {
       const e = pow.eta(shake), [kic, kcol] = KIND[shake.kind];
       card.append(h('div', { class: 'progress', role: 'progressbar', 'aria-label': kic, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(e.frac * 100)) },
-        icon(kic, 28), h('span', { class: 'bar' }, h('i', { style: { width: `${Math.round(e.frac * 100)}%`, background: kcol } })), icon('tick', 24), h('b', null, fmtWait(e.secs))));
+        icon(kic, 28), h('span', { class: 'bar' }, h('i', { style: { width: `${Math.round(e.frac * 100)}%`, background: kcol } })), icon(shake.waits === 'juice' ? 'juice' : 'tick', 24), h('b', null, pow.say(shake))));
     } else if (s.built && s.online && (t.planetaryMining !== 'noPlanetaryMining' || t.planetaryRefinery !== 'noPlanetaryRefinery')) {
       const empty = t.planetaryMining !== 'noPlanetaryMining' ? num(p.planet?.gridAttributes?.ore) <= 0 : p.ore <= 0;
       card.append(h('div', { class: 'progress' }, icon(t.planetaryMining !== 'noPlanetaryMining' ? 'dig' : 'pop', 28), icon(empty ? 'empty' : 'tick', 24), h('b', null, empty ? 'Empty' : '…')));
@@ -274,7 +275,7 @@ export function mat(ctx: Ctx): Screen {
     const e = pow.eta(shake), pct = String(Math.round(e.frac * 100));
     const fill = bar.querySelector<HTMLElement>('.bar i'), time = bar.querySelector('b');
     if (fill && fill.style.width !== pct + '%') fill.style.width = pct + '%';
-    if (time && time.textContent !== fmtWait(e.secs)) time.textContent = fmtWait(e.secs);
+    if (time && time.textContent !== pow.say(shake)) time.textContent = pow.say(shake);
     if (bar.getAttribute('aria-valuenow') !== pct) bar.setAttribute('aria-valuenow', pct);
   }
   function paintProgress(p: PlayerState | null) {
@@ -284,7 +285,7 @@ export function mat(ctx: Ctx): Screen {
       const shake = shakeOf(s.id);
       if (!shake) { stage.progress(s.id, null); continue; }
       const e = pow.eta(shake);
-      stage.progress(s.id, e.frac, KIND[shake.kind][1], fmtWait(e.secs));
+      stage.progress(s.id, e.frac, shake.waits === 'juice' ? '#FF8FB1' : KIND[shake.kind][1], pow.say(shake));
     }
   }
 
