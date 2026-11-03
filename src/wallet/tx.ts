@@ -9,14 +9,18 @@ export const FEE_DENOM = 'ualpha';
 export const DEFAULT_GAS = 500_000;
 /** Simulated gas × this, so a block's state moving under us doesn't run the tx out of gas. */
 export const GAS_MULTIPLIER = 1.6;
+/** How many blocks a signed tx may wait to be included (TxBody.timeout_height). Past it the chain can
+ * never take it, so a tx not found by then, with its account sequence unused, is provably dropped. */
+export const TX_LIFETIME_BLOCKS = 20;
 
 export interface SignerData { chainId: string; accountNumber: bigint; sequence: bigint }
 export interface Fee { amount: { denom: string; amount: string }[]; gas: number }
 
-export function txBody(msgs: Msg[], memo = ''): Uint8Array {
+export function txBody(msgs: Msg[], memo = '', timeoutHeight: bigint = 0n): Uint8Array {
   const w = new Writer();
   for (const m of msgs) w.msg(1, encodeAny(m), true);
   w.string(2, memo);
+  w.uint(3, timeoutHeight);
   return w.finish();
 }
 
@@ -41,8 +45,8 @@ export function txRaw(body: Uint8Array, auth: Uint8Array, sigs: Uint8Array[]): U
   return w.finish();
 }
 
-export function signTx(key: KeyPair, msgs: Msg[], signer: SignerData, fee: Fee, memo = ''): Uint8Array {
-  const body = txBody(msgs, memo);
+export function signTx(key: KeyPair, msgs: Msg[], signer: SignerData, fee: Fee, memo = '', timeoutHeight: bigint = 0n): Uint8Array {
+  const body = txBody(msgs, memo, timeoutHeight);
   const auth = authInfo(key.pubKey, signer.sequence, fee);
   const sig = signBytes(key.privKey, signDoc(body, auth, signer.chainId, signer.accountNumber));
   return txRaw(body, auth, [sig]);

@@ -2,6 +2,7 @@
  * names itself, prices its charge and queues the transaction. (The engine, borrowed whole; only
  * the labels speak toy.) */
 import { txq, type TxJob } from '../wallet/queue';
+import type { Msg } from '../wallet/encode';
 import { wallet } from '../wallet/wallet';
 import { empire, type OwnedStruct, type PlayerState } from './empire';
 import { typeOf, type StructType, type WeaponSystem } from '../data/catalogue';
@@ -16,6 +17,11 @@ function q(p: PlayerState, name: string, value: Record<string, unknown>, label: 
     account: p.account, playerId: p.playerId, label, source,
     lane: cost != null ? 'action' : 'immediate', chargeCost: cost,
   });
+}
+
+/** A spend prepared by game/funds, its collection legs ahead of it: one atomic transaction. */
+function spend(p: PlayerState, msgs: Msg[], label: string, source = 'you'): TxJob {
+  return txq.enqueue(msgs, { account: p.account, playerId: p.playerId, label, source, lane: 'immediate' });
 }
 
 export const act = {
@@ -36,8 +42,10 @@ export const act = {
     const cost = weapon === 'primaryWeapon' ? t.primaryWeaponCharge : t.secondaryWeaponCharge;
     return q(p, 'MsgStructAttack', { operatingStructId: s.id, targetStructId: targets, weaponSystem: weapon }, `Bonk · ${name(s)} · ${targets.map(nameOf).join(' ')}`, cost, source);
   },
-  infuseGenerator: (p: PlayerState, s: OwnedStruct, ualpha: bigint) => q(p, 'MsgStructGeneratorInfuse', { structId: s.id, infuseAmount: `${ualpha}ualpha` }, `Feed · ${name(s)}`),
-  trash: (p: PlayerState, s: OwnedStruct) => q(p, 'MsgStructTrash', { structId: s.id }, `Toss · ${name(s)}`, s.type?.buildCharge ?? 8),
+  /** `msgs` from funds.feedMsgs: any collection into the vault first, then the infusion, in one tx. */
+  infuseGenerator: (p: PlayerState, s: OwnedStruct, msgs: Msg[]) => spend(p, msgs, `Feed · ${name(s)}`),
+  // a charge action since v0.22 (the build charge, 1 for every type)
+  trash: (p: PlayerState, s: OwnedStruct) => q(p, 'MsgStructTrash', { structId: s.id }, `Toss · ${name(s)}`, s.type?.buildCharge ?? 1),
   fleetMove(p: PlayerState, destination: string, source?: string) {
     // a second press while the wagon's last move is still on its way is the same move, not another
     const going = txq.active.find((j) => j.playerId === p.playerId && j.msgs.some((m) => m.typeUrl.endsWith('MsgFleetMove')));
@@ -47,11 +55,12 @@ export const act = {
   explore: (p: PlayerState, source?: string) => q(p, 'MsgPlanetExplore', { playerId: p.playerId }, 'Find', undefined, source),
   renamePlanet: (p: PlayerState, nm: string) => q(p, 'MsgPlanetUpdateName', { planetId: p.planetId, name: nm }, `Name · ${nm}`),
   renamePlayer: (p: PlayerState, nm: string) => q(p, 'MsgPlayerUpdateName', { playerId: p.playerId, name: nm }, `Name · ${nm}`),
-  send: (p: PlayerState, to: string, ualpha: bigint, source?: string) => q(p, 'MsgPlayerSend', { from_address: p.address, to_address: to, amount: [{ denom: 'ualpha', amount: ualpha.toString() }] }, 'Give', undefined, source),
+  /** `msgs` from funds.giveMsgs: vault to vault (MsgVaultSend). */
+  give: (p: PlayerState, msgs: Msg[], source?: string) => spend(p, msgs, 'Give', source),
 };
 
 /** Why the chain would refuse a build for this player right now (BuildInitiateReadiness and
- * MsgStructBuildInitiate in v0.21), or null when it would take it. */
+ * MsgStructBuildInitiate in v0.22), or null when it would take it. */
 export function buildBlock(p: PlayerState, t?: StructType): string | null {
   if (!p.online) return 'juice';
   const f = p.fleet;
@@ -100,7 +109,7 @@ export function matToysOn(p: PlayerState): number[] {
  * while the rite still makes sense. */
 export const AGAIN_MS = 2 * 60_000;
 export function canRetry(j: TxJob, now = Date.now()): boolean {
-  if (j.status !== 'failed' || now - j.updatedAt > AGAIN_MS) return false;
+  if (j.status !== 'failed' || j.uncertain || now - j.updatedAt > AGAIN_MS) return false;
   if (j.playerId && !wallet.byPlayer(j.playerId)) return false;
   const p = j.playerId ? empire.players.get(j.playerId) : undefined;
   for (const m of j.msgs) {

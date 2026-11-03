@@ -9,12 +9,16 @@
  *              and re-signs.
  *   hashes     computed before broadcast (sha256 of the tx bytes), so a reload mid-flight can
  *              find out whether the tx landed instead of sending it twice.
+ *   lifetime   every tx carries a timeout height (TX_LIFETIME_BLOCKS ahead). One not found once the
+ *              chain is past it, with its sequence still unused, provably never ran and may go again;
+ *              anything less certain is left unknown and never re-sent.
  *   gas        simulated, ×1.6; a simulation that fails for a reason that time fixes (charge,
  *              proof) waits and retries, anything else fails the job with the chain's reason.
  * Jobs persist in localStorage (messages only — never keys). */
 import { sha256 } from '@noble/hashes/sha2.js';
 import { wallet, WalletLockedError } from './wallet';
-import { account, broadcast, ChainTxError, stripCosmosTail, chainId, DEFAULT_GAS, FEE_DENOM, GAS_MULTIPLIER, getTx, humanError, signTx, simulate, type TxResult } from './tx';
+import { account, broadcast, ChainTxError, stripCosmosTail, chainId, DEFAULT_GAS, FEE_DENOM, GAS_MULTIPLIER, getTx, humanError, signTx, simulate, TX_LIFETIME_BLOCKS, type TxResult } from './tx';
+import { lcd } from '../chain/lcd';
 import { msgName, validateMsg, type Msg } from './encode';
 import { toHex } from './keys';
 import { live } from '../chain/live';
@@ -53,7 +57,11 @@ export interface TxJob {
   signer?: string;
   /** The account sequence this job was last signed at, and when it went pending. */
   signedSeq?: string;
+  /** The last block the signed tx could be included in (its TxBody timeout_height). */
+  timeoutHeight?: string;
   pendingSince?: number;
+  /** Failed without knowing whether it ran (sent, then lost sight of): never offered again. */
+  uncertain?: boolean;
   /** Events the chain emitted for this tx, once included (type + JSON payloads). */
   events?: { type: string; data: unknown }[];
 }
@@ -195,7 +203,7 @@ class TxQueue {
 
   retry(id: string) {
     const j = this.jobs.find((x) => x.id === id);
-    if (!j || !['failed', 'cancelled'].includes(j.status)) return;
+    if (!j || !['failed', 'cancelled'].includes(j.status) || j.uncertain) return;
     this.op({ op: 'retry', id });
   }
 
@@ -292,10 +300,12 @@ class TxQueue {
       }
       const fee0 = { amount: [{ denom: FEE_DENOM, amount: '0' }], gas: DEFAULT_GAS };
       let gas = DEFAULT_GAS;
+      const height = live.height || (await lcd.latestHeight()).height;
+      const timeout = BigInt(height + TX_LIFETIME_BLOCKS);
       // Proofs are judged at the inclusion height, but simulation runs a block behind and would
       // refuse a proof that is valid next block. Their gas is small and fixed; skip the dry run.
       if (!j.msgs.some((m) => PROOF_MSGS.has(msgName(m.typeUrl)))) try {
-        const used = await simulate(signTx(key, j.msgs, { chainId: cid, ...s }, fee0, j.memo));
+        const used = await simulate(signTx(key, j.msgs, { chainId: cid, ...s }, fee0, j.memo, timeout));
         gas = Math.max(200_000, Math.ceil(used * GAS_MULTIPLIER));
       } catch (e) {
         const msg = (e as Error).message || '';
@@ -304,9 +314,9 @@ class TxQueue {
         // The ante handler or the message itself refused: the same reason the real tx would fail with.
         throw new ChainTxError(-2, 'simulate', stripCosmosTail(msg.replace(/^.*?message index: \d+: /, '').replace(/: unknown request$/, '')));
       }
-      const bytes = signTx(key, j.msgs, { chainId: cid, ...s }, { ...fee0, gas }, j.memo);
+      const bytes = signTx(key, j.msgs, { chainId: cid, ...s }, { ...fee0, gas }, j.memo, timeout);
       const hash = toHex(sha256(bytes)).toUpperCase();
-      this.set(j, { hash, signedSeq: s.sequence.toString() });
+      this.set(j, { hash, signedSeq: s.sequence.toString(), timeoutHeight: timeout.toString() });
       const prev = this.sentAt.get(j.account);
       const same = prev && (live.height ? prev.height === live.height : Date.now() - prev.at < 7000);
       this.sentAt.set(j.account, { height: live.height, at: same ? prev!.at : Date.now(), n: same ? prev!.n + 1 : 1 });
@@ -315,13 +325,13 @@ class TxQueue {
       s.sequence += 1n;
       this.set(j, { status: 'pending', pendingSince: Date.now() });
     } catch (e) {
-      if (e instanceof RetryNow) { this.set(j, { status: 'queued', attempts: j.attempts - 1, hash: undefined }); return; }
+      if (e instanceof RetryNow) { this.set(j, { status: 'queued', attempts: j.attempts - 1, hash: undefined, timeoutHeight: undefined }); return; }
       if (e instanceof WalletLockedError) { this.set(j, { status: 'waiting', waitReason: 'soulstone sealed', attempts: j.attempts - 1 }); return; }
       const ce = e instanceof ChainTxError ? e : null;
       if (ce?.expectedSequence != null) {
         const s = this.seq.get(j.account);
         if (s) s.sequence = ce.expectedSequence;
-        this.set(j, { status: 'queued', hash: undefined, attempts: j.attempts - 1 });
+        this.set(j, { status: 'queued', hash: undefined, timeoutHeight: undefined, attempts: j.attempts - 1 });
         return;
       }
       if (ce && ce.code === 19) { this.set(j, { status: 'pending', pendingSince: Date.now() }); return; }   // already in the mempool
@@ -334,15 +344,15 @@ class TxQueue {
       // A failed simulation leaves the sequence alone; a network failure might not have.
       if (!ce) this.seq.delete(j.account);
       if (transient && j.attempts < j.maxAttempts) {
-        this.set(j, { status: 'waiting', waitReason: msg, hash: undefined, notBefore: Date.now() + backoff(j.attempts) });
+        this.set(j, { status: 'waiting', waitReason: msg, hash: undefined, timeoutHeight: undefined, notBefore: Date.now() + backoff(j.attempts) });
       } else {
         this.fail(j, msg, ce?.code);
       }
     }
   }
 
-  private fail(j: TxJob, error: string, code?: number) {
-    this.set(j, { status: 'failed', error, code });
+  private fail(j: TxJob, error: string, code?: number, uncertain = false) {
+    this.set(j, { status: 'failed', error, code, uncertain: uncertain || undefined });
     safeEach(this.doneL, (f) => f(j));
   }
 
@@ -355,19 +365,25 @@ class TxQueue {
         let r: TxResult | null = null;
         try { r = await getTx(j.hash!); } catch { continue; }
         if (!r) {
-          // Not found for 90 s. Re-sign only if its sequence is still unused — otherwise something
-          // signed at that number landed (perhaps this very move under another hash) and a re-send
-          // could do it twice.
-          if (Date.now() - (j.pendingSince ?? j.updatedAt) > 90_000) {
-            this.seq.delete(j.account);
-            const addr = wallet.account(j.account)?.address;
-            if (!addr || (j.signer && addr !== j.signer)) { this.fail(j, 'Its warden left this soulstone; what became of it is unknown'); continue; }
-            const a = await account(addr).catch(() => null);
-            if (!a) continue;
-            if (j.signedSeq != null && a.sequence > BigInt(j.signedSeq)) this.fail(j, 'Not found, but its slot in the account sequence was used — it may have landed; not re-sending');
-            else if (j.attempts < j.maxAttempts) this.set(j, { status: 'queued', hash: undefined, signedSeq: undefined });
-            else this.fail(j, 'Lost on the wind');
+          // Not found. Until the chain is past its timeout height it may still land: keep waiting.
+          // Once past (a block of margin for the indexer), it never can — and if its sequence is still
+          // unused it never ran, so it may go again. A used sequence means something signed at that
+          // number landed (perhaps this very move under another hash): unknown, never re-sent.
+          if (!j.timeoutHeight) {
+            // signed before txs carried a lifetime: nothing can prove it dropped, so it is never re-sent
+            if (Date.now() - (j.pendingSince ?? j.updatedAt) > 90_000) this.fail(j, 'Not found, and it may yet land: what became of it is unknown — not re-sending', undefined, true);
+            continue;
           }
+          const h = live.height || (await lcd.latestHeight().then((x) => x.height).catch(() => 0));
+          if (!h || BigInt(h) <= BigInt(j.timeoutHeight) + 1n) continue;
+          this.seq.delete(j.account);
+          const addr = wallet.account(j.account)?.address;
+          if (!addr || (j.signer && addr !== j.signer)) { this.fail(j, 'Its warden left this soulstone; what became of it is unknown', undefined, true); continue; }
+          const a = await account(addr).catch(() => null);
+          if (!a) continue;
+          if (j.signedSeq == null || a.sequence > BigInt(j.signedSeq)) this.fail(j, 'Not found, but its slot in the account sequence was used — it may have landed; not re-sending', undefined, true);
+          else if (j.attempts < j.maxAttempts) this.set(j, { status: 'queued', hash: undefined, signedSeq: undefined, timeoutHeight: undefined });
+          else this.fail(j, 'Lost on the wind');
           continue;
         }
         const events = r.events.filter((e) => e.type.startsWith('structs.structs.')).map((e) => {
@@ -382,7 +398,7 @@ class TxQueue {
         } else {
           this.set(j, { height: r.height, gasUsed: r.gasUsed });
           const msg = humanError(r.code, '', r.log);
-          if (isTransient(r.log, r.code, j.msgs.some((m) => PROOF_MSGS.has(msgName(m.typeUrl)))) && j.attempts < j.maxAttempts) this.set(j, { status: 'waiting', waitReason: msg, hash: undefined, notBefore: Date.now() + backoff(j.attempts) });
+          if (isTransient(r.log, r.code, j.msgs.some((m) => PROOF_MSGS.has(msgName(m.typeUrl)))) && j.attempts < j.maxAttempts) this.set(j, { status: 'waiting', waitReason: msg, hash: undefined, timeoutHeight: undefined, notBefore: Date.now() + backoff(j.attempts) });
           else this.fail(j, msg, r.code);
         }
       }
@@ -435,7 +451,7 @@ function applyOp(jobs: TxJob[], o: QueueOp) {
   if (i < 0) return;
   const j = jobs[i];
   if (o.op === 'cancel' && ['queued', 'waiting'].includes(j.status)) Object.assign(j, { status: 'cancelled', error: 'Cancelled', updatedAt: now });
-  if (o.op === 'retry' && ['failed', 'cancelled'].includes(j.status)) Object.assign(j, { status: 'queued', attempts: 0, error: undefined, code: undefined, hash: undefined, notBefore: undefined, signedSeq: undefined, updatedAt: now });
+  if (o.op === 'retry' && ['failed', 'cancelled'].includes(j.status)) Object.assign(j, { status: 'queued', attempts: 0, error: undefined, code: undefined, hash: undefined, notBefore: undefined, signedSeq: undefined, timeoutHeight: undefined, updatedAt: now });
   if (o.op === 'move') { const k = i + o.delta; if (k >= 0 && k < jobs.length) [jobs[i], jobs[k]] = [jobs[k], jobs[i]]; }
 }
 

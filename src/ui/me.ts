@@ -4,6 +4,7 @@ import { icon } from './icons';
 import { outLinks } from './links';
 import { wallet } from '../wallet/wallet';
 import { empire } from '../game/empire';
+import { available } from '../game/funds';
 import { guilds, guildsNow } from '../guild/directory';
 import { clubColor, clubName, kidName, fmtStars } from '../lore';
 
@@ -39,7 +40,7 @@ export function openMe() {
       h('div', { class: 'row nowrap' }, h('span', { style: { display: 'grid', placeItems: 'center', width: '88px', height: '88px', borderRadius: '50%', background: '#FFC72C', border: `6px solid ${clubColor(gid)}` } }, icon('kid', 60)),
         h('div', { class: 'stack', style: { gap: '4px' } }, h('h2', { class: 'big-word' }, p ? kidName(p) : 'Me'),
           h('span', { class: 'row', style: { gap: '6px' } }, h('span', { class: 'flag', style: { minHeight: '40px' } }, h('span', { class: 'sw', style: { background: clubColor(gid) } }), club),
-            p ? h('span', { class: 'state' }, icon('star', 26), fmtStars(p.alpha)) : null))),
+            p ? h('span', { class: 'state' }, icon('star', 26), fmtStars(available(p))) : null))),
     );
     if (words) {
       body.append(h('div', { class: 'row' }, icon('words', 44), h('h3', { class: 'mid-word' }, 'Words')),

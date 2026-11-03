@@ -8,6 +8,7 @@ import { wallet } from '../wallet/wallet';
 import { txq } from '../wallet/queue';
 import { safeEach, sleep } from '../core/util';
 import { typeOf, type StructType } from '../data/catalogue';
+import { vaultOf } from './funds';
 
 export interface OwnedStruct {
   id: string; typeId: number; type: StructType | undefined;
@@ -30,7 +31,9 @@ export interface PlayerState {
   substationId: string;
   planetId: string;
   fleetId: string;
-  alpha: bigint;          // ualpha in the player's wallet (playerInventory)
+  alpha: bigint;          // ualpha in the player's vault (playerInventory follows the vault since v0.22)
+  vault: string;          // the vault's address ('' until read)
+  retained: bigint;       // ualpha still on the key's own address: spendable, collected into the vault as needed
   ore: number;            // stored ore (raidable)
   load: bigint; structsLoad: bigint; capacity: bigint; connectionCapacity: bigint;
   lastAction: number;
@@ -156,11 +159,15 @@ class Empire {
       const pf: PlayerFull = await lcd.player(playerId);
       const P = pf.Player;
       const g = pf.gridAttributes || {};
-      const [planet, fleet, sub] = await Promise.all([
+      const prev = this.players.get(playerId);
+      const [planet, fleet, sub, vault, retained] = await Promise.all([
         P.planetId ? lcd.planet(P.planetId).catch(() => null) : Promise.resolve(null),
         P.fleetId ? lcd.fleet(P.fleetId).catch(() => null) : Promise.resolve(null),
         // Secondary capacity is the substation's per-connection share, not a grid record of the player.
         P.substationId ? lcd.entity<{ gridAttributes?: { connectionCapacity?: string } }>('substation', P.substationId).catch(() => null) : Promise.resolve(null),
+        vaultOf(playerId).catch(() => prev?.vault || ''),
+        // Only our own kids spend; a read that fails is "as before", never zero.
+        acct ? lcd.spendable(acct.address).catch(() => prev?.retained ?? 0n) : Promise.resolve(0n),
       ]);
       const share = big(sub?.gridAttributes?.connectionCapacity);
       const target = fleet && fleet.status === 'away' && fleet.locationType === 'planet' && fleet.locationId
@@ -180,7 +187,7 @@ class Empire {
         playerId, account: acct ? acct.index : -1, address: acct ? acct.address : P.primaryAddress,
         name: P.name || playerId, pfp: P.pfpClientRenderAttributes, guildId: P.guildId, substationId: P.substationId,
         planetId: P.planetId, fleetId: P.fleetId,
-        alpha: big(pf.playerInventory?.rocks?.amount), ore: num(g.ore),
+        alpha: big(pf.playerInventory?.rocks?.amount), vault, retained, ore: num(g.ore),
         load: big(g.load), structsLoad: big(g.structsLoad), capacity: big(g.capacity), connectionCapacity: share,
         lastAction: num(g.lastAction),
         online: big(g.load) + big(g.structsLoad) <= big(g.capacity) + share,

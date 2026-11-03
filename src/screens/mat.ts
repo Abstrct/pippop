@@ -7,6 +7,8 @@ import { world } from '../world/world';
 import { matStage } from '../world/mat';
 import { empire, type OwnedStruct, type PlayerState } from '../game/empire';
 import { act, actionBlock, buildBlock, canRetry, findBlock, matToysOn, verbsFor } from '../game/actions';
+import { available, feedMsgs } from '../game/funds';
+import type { Msg } from '../wallet/encode';
 import { wallet } from '../wallet/wallet';
 import { txq, type TxJob } from '../wallet/queue';
 import { claimJob, releaseClaim } from '../core/claims';
@@ -220,21 +222,26 @@ export function mat(ctx: Ctx): Screen {
   }
   function feedBox(p: PlayerState, s: OwnedStruct) {
     let n = 1;
-    const max = Math.floor(Number(p.alpha) / 1e6 * 1000) / 1000;
+    const max = Math.floor(Number(available(p)) / 1e6 * 1000) / 1000;
     const val = h('span', { class: 'big-word', style: { minWidth: '120px', textAlign: 'center' } }, '1');
     // what feeding it does: each star becomes juice at this toy's own rate
     const gain = h('b', null, '');
     const rate = s.type?.generatingRate || 0;
     const set = (x: number) => { n = Math.max(0.001, Math.min(max, Math.round(x * 1000) / 1000)); val.textContent = String(n); gain.textContent = '+' + short(Math.round(n * 1000 * rate)); };
     const v = veil('Feed', 'feed',
-      h('div', { class: 'row center' }, h('span', { class: 'state' }, icon('star', 26), fmtStars(p.alpha)), h('span', { class: 'state', role: 'img', 'aria-label': 'Juice' }, icon('juice', 26), gain)),
+      h('div', { class: 'row center' }, h('span', { class: 'state' }, icon('star', 26), fmtStars(available(p))), h('span', { class: 'state', role: 'img', 'aria-label': 'Juice' }, icon('juice', 26), gain)),
       h('div', { class: 'row center nowrap' },
         h('button', { type: 'button', class: 'round', 'aria-label': 'Less', onclick: () => set(n >= 2 ? n - 1 : n / 2) }, icon('minus', 44)),
         h('span', { class: 'row nowrap', style: { gap: '4px' } }, icon('star', 44), val),
         h('button', { type: 'button', class: 'round', 'aria-label': 'More', onclick: () => set(n >= 1 ? n + 1 : n * 2) }, icon('plus', 44))),
-      h('div', { class: 'row center' }, h('button', { type: 'button', class: 'pill big peach', disabled: max <= 0, onclick: () => {
-        const u = BigInt(Math.round(n * 1e6)); if (u <= 0n || u > p.alpha) { bubble('Stars', 'star', 'uh'); return; }
-        v.remove(); rite(p, () => act.infuseGenerator(p, s, u), false, s.id);
+      h('div', { class: 'row center' }, h('button', { type: 'button', class: 'pill big peach', disabled: max <= 0, onclick: async (e: Event) => {
+        const u = BigInt(Math.round(n * 1e6)); if (u <= 0n || u > available(p)) { bubble('Stars', 'star', 'uh'); return; }
+        // the vault pays; stars still on the key's own address top it up in the same tx
+        const btn = e.currentTarget as HTMLButtonElement;
+        btn.disabled = true;
+        let msgs: Msg[];
+        try { msgs = await feedMsgs(p, s.id, u); } catch (err) { btn.disabled = false; const w = oops((err as Error).message); bubble(w.w, w.i, 'uh'); return; }
+        v.remove(); rite(p, () => act.infuseGenerator(p, s, msgs), false, s.id);
       } }, icon('feed', 34), 'Feed')));
     set(max <= 0 ? 0 : 1);
   }
@@ -336,7 +343,7 @@ export function mat(ctx: Ctx): Screen {
     const p = player();
     if (j.status !== 'success' || !p || j.playerId !== p.playerId) return;
     const urls = j.msgs.map((m) => m.typeUrl).join();
-    const v = (j.msgs[0]?.value || {}) as Record<string, unknown>;
+    const v = (j.msgs[j.msgs.length - 1]?.value || {}) as Record<string, unknown>;   // the act, after any collection
     const sid = String(v.structId || v.defenderStructId || '');
     if (/OreMinerComplete/.test(urls)) { stage.rite('dig', sid); audio.chime('dig'); bubble('Dig', 'dig', 'yay', { toy: 'rock' }); }
     if (/OreRefineryComplete/.test(urls)) { stage.rite('pop', sid); audio.chime('pop'); setTimeout(() => audio.chime('pop'), 140); setTimeout(() => audio.chime('pop'), 300); shout('Pop!', 'star'); }

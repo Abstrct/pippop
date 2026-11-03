@@ -119,9 +119,31 @@ export function tryNonce(job: HashJob, out: Int32Array = scratch): number {
   return leadingZeros(out);
 }
 
-/** the ledger node's CalculateDifficulty. */
+/** The ledger's CalculateDifficulty (types/work.go, v0.22): leading hex zeroes a proof needs, 64 at the
+ * start falling to 1 as the work ages. In integers, like the chain since v0.22 (a float log could split
+ * validators): 64 - max{ k ≤ 63 : range^k ≤ age^63 }. */
 export function difficultyAt(age: number, range: number): number {
-  if (age <= 1) return 64;
-  const d = 64 - Math.floor((Math.log10(age) / Math.log10(range)) * 63);
-  return d < 1 ? 1 : d;
+  if (age <= 1 || range <= 1) return 64;
+  const ceiling = BigInt(Math.floor(age)) ** 63n, base = BigInt(Math.floor(range));
+  let power = 1n, exponent = 0;
+  for (let k = 1; k <= 63; k++) {
+    power *= base;
+    if (power > ceiling) break;
+    exponent = k;
+  }
+  return 64 - exponent;
+}
+
+/** The youngest age (blocks since the work's start) at which difficultyAt(age, range) ≤ zeros:
+ * the least age with age^63 ≥ range^(64 - zeros). Infinity when the bar never falls. */
+export function ageFor(range: number, zeros: number): number {
+  if (zeros >= 64) return 0;
+  if (range <= 1) return Infinity;
+  const e = 64 - Math.max(1, Math.floor(zeros));
+  const target = BigInt(Math.floor(range)) ** BigInt(e);
+  // the float root lands within a step or two; settle it exactly
+  let a = Math.max(2, Math.ceil(Math.pow(range, e / 63)));
+  while (a > 2 && BigInt(a - 1) ** 63n >= target) a--;
+  while (BigInt(a) ** 63n < target) a++;
+  return a;
 }

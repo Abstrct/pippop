@@ -1,20 +1,21 @@
 /* The Fridge: where stars turn into juice. Every club keeps a jar (a reactor); put stars in (Fill,
- * MsgReactorInfuse) and your cup gets more juice; take them back out (Take, MsgReactorDefuse) slowly. */
+ * MsgReactorInfuse) and your cup gets more juice; take them back out (Take, MsgReactorDefuse) slowly.
+ * Since v0.22 the stars come from, and stakes belong to, the kid's vault (game/funds). */
 import { h, clear, bubble, confirmBox } from '../core/dom';
 import { icon } from '../ui/icons';
 import { world } from '../world/world';
 import { fridgeStage } from '../world/rooms';
-import { lcd, big, type Grid, type RawInfusion, type RawReactor } from '../chain/lcd';
+import { lcd, big, type Grid, type RawReactor } from '../chain/lcd';
 import { guilds, type GuildEntry } from '../guild/directory';
 import { empire } from '../game/empire';
 import { wallet } from '../wallet/wallet';
 import { txq } from '../wallet/queue';
+import { available, fillMsgs, stakeIn, takeMsgs, type Stake } from '../game/funds';
 import { audio } from '../core/audio';
 import { clubColor, clubName, fmtJuice, fmtStars, oops, short } from '../lore';
 import type { Ctx, Screen } from './types';
 
 interface Well { r: RawReactor; grid: Grid; cut: number }
-const M = (name: string, value: Record<string, unknown>) => ({ typeUrl: `/structs.structs.${name}`, value });
 
 export function fridge(_ctx: Ctx): Screen {
   const stage = fridgeStage({ pick: (id) => choose(id) });
@@ -23,21 +24,24 @@ export function fridge(_ctx: Ctx): Screen {
   const cupCard = h('section', { class: 'card panel left stack', 'aria-label': 'Cup' });
   const el = h('div', null, cupCard, card);
 
-  let wells: Well[] = [], fills: RawInfusion[] = [], clubs = new Map<string, GuildEntry>(), sel: string | null = null, left = false;
+  let wells: Well[] = [], fills = new Map<string, Stake>(), clubs = new Map<string, GuildEntry>(), sel: string | null = null, left = false;
   const name = (gid: string) => clubName(gid, clubs.get(gid)?.meta?.name);
 
   async function load() {
     const p = empire.commander;
-    const [rs, inf, gs] = await Promise.all([
-      lcd.list<RawReactor>('reactor', 'Reactor'),
-      p ? lcd.list<RawInfusion>('infusion', 'Infusion').catch(() => [] as RawInfusion[]) : Promise.resolve([] as RawInfusion[]),
-      guilds().catch(() => [] as GuildEntry[]),
+    const [rs, gs] = await Promise.all([lcd.list<RawReactor>('reactor', 'Reactor'), guilds().catch(() => [] as GuildEntry[])]);
+    const [grids, stakes] = await Promise.all([
+      Promise.all(rs.map((r) => lcd.entity<{ gridAttributes?: Grid }>('reactor', r.id).then((x) => x.gridAttributes || {}).catch(() => ({} as Grid)))),
+      // what's mine in each jar: the vault's position and the key's own, two small reads a jar
+      p ? Promise.all(rs.map((r) => stakeIn(p, r.id).catch(() => null))) : Promise.resolve([] as (Stake | null)[]),
     ]);
-    const grids = await Promise.all(rs.map((r) => lcd.entity<{ gridAttributes?: Grid }>('reactor', r.id).then((x) => x.gridAttributes || {}).catch(() => ({} as Grid))));
     if (left) return;
     clubs = new Map(gs.map((c) => [c.id, c]));
     wells = rs.map((r, i) => ({ r, grid: grids[i], cut: Number(r.defaultCommission || 0) })).sort((a, b) => Number(big(b.grid.fuel) - big(a.grid.fuel)));
-    fills = p ? inf.filter((i) => i.address === p.address && i.destinationType === 'reactor') : [];
+    // a jar that wouldn't answer keeps what we knew of it
+    const prev = fills;
+    fills = new Map();
+    if (p) rs.forEach((r, i) => { const st = stakes[i] ?? prev.get(r.id); if (st && st.total > 0n) fills.set(r.id, st); });
     paint();
   }
 
@@ -51,17 +55,17 @@ export function fridge(_ctx: Ctx): Screen {
     const ourWell = p ? clubs.get(p.guildId)?.chain?.primaryReactorId : undefined;
     const maxFuel = wells.reduce((m, w) => (big(w.grid.fuel) > m ? big(w.grid.fuel) : m), 1n);
     const cap = p ? p.capacity + p.connectionCapacity : 0n, load = p ? p.load + p.structsLoad : 0n;
-    stage.set(wells.map((w) => ({ id: w.r.id, color: clubColor(w.r.guildId), fill: Number((big(w.grid.fuel) * 1000n) / maxFuel) / 1000, ours: w.r.id === ourWell, mine: fills.some((f) => f.destinationId === w.r.id), label: name(w.r.guildId) })), cap > 0n ? Number(((cap - (load > cap ? cap : load)) * 100n) / cap) / 100 : 0);
+    stage.set(wells.map((w) => ({ id: w.r.id, color: clubColor(w.r.guildId), fill: Number((big(w.grid.fuel) * 1000n) / maxFuel) / 1000, ours: w.r.id === ourWell, mine: fills.has(w.r.id), label: name(w.r.guildId) })), cap > 0n ? Number(((cap - (load > cap ? cap : load)) * 100n) / cap) / 100 : 0);
     // my cup
     clear(cupCard);
     if (!p) cupCard.append(h('a', { class: 'pill big red', href: '#/hi' }, icon('gift', 30), 'Play'));
     else {
-      const mineIn = fills.reduce((a, t) => a + big(t.fuel), 0n);
+      const mineIn = [...fills.values()].reduce((a, t) => a + t.total, 0n);
       cupCard.append(h('div', { class: 'row' }, icon('cup', 56), h('h2', { class: 'big-word' }, 'Me')),
         h('div', { class: 'facts' },
           h('span', { class: 'fact', title: 'Juice' }, icon('juice', 30), fmtJuice(cap - load > 0n ? cap - load : 0n)),
           h('span', { class: 'fact', title: 'All' }, icon('cup', 30), fmtJuice(cap)),
-          h('span', { class: 'fact', title: 'Stars' }, icon('star', 30), fmtStars(p.alpha)),
+          h('span', { class: 'fact', title: 'Stars' }, icon('star', 30), fmtStars(available(p))),
           h('span', { class: 'fact', title: 'In' }, icon('fridge', 30), fmtStars(mineIn))),
         ourWell ? h('button', { type: 'button', class: 'pill big sun wiggle', 'aria-label': 'Fill', onclick: () => choose(ourWell) }, icon('star', 30), icon('go', 26), icon('fridge', 30)) : '');
     }
@@ -70,7 +74,7 @@ export function fridge(_ctx: Ctx): Screen {
     const w = wells.find((x) => x.r.id === sel);
     card.hidden = !w;
     if (!w) return;
-    const myFill = big(fills.find((t) => t.destinationId === w.r.id)?.fuel);
+    const myFill = fills.get(w.r.id)?.total ?? 0n;
     card.append(
       h('button', { type: 'button', class: 'round x', 'aria-label': 'Close', onclick: () => choose(null), style: { width: '52px', height: '52px' } }, icon('close', 34)),
       h('div', { class: 'toy-head' }, h('span', { style: { display: 'grid', placeItems: 'center', width: '72px', height: '72px', borderRadius: '24px', background: clubColor(w.r.guildId) } }, icon('fridge', 52)),
@@ -88,7 +92,7 @@ export function fridge(_ctx: Ctx): Screen {
   function stepper(w: Well, out: boolean) {
     const p = empire.commander; if (!p) return;
     if (!wallet.unlocked) { bubble('Key', 'key', 'uh'); return; }
-    const max = out ? big(fills.find((t) => t.destinationId === w.r.id)?.fuel) : p.alpha;
+    const max = out ? fills.get(w.r.id)?.total ?? 0n : available(p);
     if (max <= 0n) { bubble('Stars', 'star', 'uh', { action: { label: 'Mat', icon: 'mat', run: () => { location.hash = '#/'; } } }); return; }
     const maxN = Number(max) / 1e6;
     let n = Math.min(1, maxN);
@@ -111,8 +115,9 @@ export function fridge(_ctx: Ctx): Screen {
           if (out && !(await confirmBox('Take?', '', 'Take', 'enemy', { icon: 'juice', okIcon: 'take', stay: 'Keep' }))) return;
           v.remove();
           try {
-            const job = txq.enqueue(M(out ? 'MsgReactorDefuse' : 'MsgReactorInfuse', { delegator_address: p.address, validator_address: w.r.validator, amount: { denom: 'ualpha', amount: u.toString() } }),
-              { account: p.account, playerId: p.playerId, label: out ? 'Take' : 'Fill', source: 'you' });
+            // read fresh, right before queueing: the vault first, the key's own address for any shortfall
+            const msgs = out ? takeMsgs(p, w.r.validator, await stakeIn(p, w.r.id), u) : await fillMsgs(p, w.r.validator, u);
+            const job = txq.enqueue(msgs, { account: p.account, playerId: p.playerId, label: out ? 'Take' : 'Fill', source: 'you' });
             stage.pour(w.r.id, out); audio.chime(out ? 'boop' : 'pop');
             const off = txq.onSettled((j) => { if (j.id !== job.id || j.status === 'failed') return; off(); if (j.status === 'success' && !left) setTimeout(() => { if (!left) void load(); }, 1200); });
             offs.push(off);

@@ -42,7 +42,7 @@ Links to [Structs](https://playstructs.com) and its [technical documentation](ht
 | blocks | **Toys** `#/toys/<type>` | the shelf: every struct type as symbols; Make (`MsgStructBuildInitiate`) |
 | mobile | **Sky** `#/sky` | every pet hanging from a crib mobile in their club's colour; Peek, Roll (`MsgFleetMove`) |
 | mallet | **Bonk** `#/bonk/<pet>` | Roll › bonk their Bear › Grab. Odds from the chain's own combat rules; `MsgStructAttack` |
-| fridge | **Fridge** `#/fridge` | every club's juice jar (reactor); Fill / Take (`MsgReactorInfuse` / `Defuse`) |
+| fridge | **Fridge** `#/fridge` | every club's juice jar (reactor); Fill / Take (`MsgReactorInfuse` / `Defuse`, from and to your vault) |
 | book | **Book** `#/book` | the picture dictionary, with all 22 toys on a carousel |
 
 Shakes (proofs of work for Make, Dig, Pop and Grab) run on Web Workers and WebGPU in the tab and submit themselves; the tray at the bottom left shows each one filling up.
@@ -59,6 +59,7 @@ Shakes (proofs of work for Make, Dig, Pop and Grab) run on Web Workers and WebGP
 | Make · Wake · Nap · Hide · Peek · Hug · Free · Hop · Bonk · Feed · Toss | Build · Activate · Deactivate · Stealth on · Stealth off · Defend · Clear defense · Move · Attack · Generator infuse · Trash |
 | Dig · Pop · Find · Roll · Home · Grab · Shake | Mine · Refine · Explore · Fleet move · Return · Raid · Proof of work |
 | Key · Magic words | Wallet key · Recovery phrase |
+| Stars (on the Me box and the meters) | Player vault balance + Alpha still on the key's own address |
 | Bear, Rocket, Zoom, Saucer, Plane, Kite, Copter, Choo, Truck, Squirt, Duck, Boat, Fish | Command Ship, Battleship, Starfighter, Frigate, Pursuit Fighter, Stealth Bomber, High Altitude Interceptor, Mobile Artillery, Tank, SAM Launcher, Cruiser, Destroyer, Submersible |
 | Digger, Popper, Bubble, Rattle, Piggy, Popgun, Pinwheel, Windmill, Sun | Ore Extractor, Ore Refinery, Orbital Shield Generator, Jamming Satellite, Ore Bunker, Planetary Defense Cannon, Field Generator, Continental Power Plant, World Engine |
 | Wiggle · Duck · Hide · Tough · Lob | Signal jamming · Defensive maneuver · Stealth · Armour · Indirect combat |
@@ -69,14 +70,25 @@ The network layer is borrowed whole from Wyrmhold (`structs-fantasy`), which too
 
 Everything else is new: the three.js world (`src/world/*`: 22 procedural toys, the stacking-pole mat, the crib mobile, the bonk rug, the fridge, the shelf, the gift box, the carousel), the words (`src/lore.ts`, where every refusal becomes one word), the symbols (`src/ui/icons.ts`), the synthesized sounds (`src/core/audio.ts`) and every room.
 
+## The ledger it speaks: structsd v0.22.0
+
+The public testnet (`structstestnet-111`) runs structsd v0.22.0 since block 3,353,000. What that changed here, following the [client migration guide](https://structs.ai/develop/client/migration.html):
+
+- **Messages**: `src/wallet/schema.gen.ts` is generated from the release protos by `node scripts/gen-msgs.mjs /path/to/structsd v0.22.0` (it reads the tag's commit, not the working tree). The new owner selectors (`ownerId` on reactor messages), `MsgVaultSend` and the rank-purchase messages are in it.
+- **Vaults**: a player's spendable Alpha lives in its vault, a protocol address (`/structs/vault/<player>`); the player query's inventory follows the vault. Alpha still on the key's own address is "retained". Fill, Feed and Give (`src/game/funds.ts`) spend from the vault, and when it is short, the same transaction first moves only the shortfall from the key's address (`MsgPlayerSend`), never as a separate send. Take unstakes the vault's position first, then the key address's, each with its own selector, in one transaction.
+- **Proof of work**: difficulty is integer arithmetic now (`types.CalculateDifficulty`), and the shakes use the same rule (`src/pow/sha.ts`).
+- **Catalogue**: every build charge is 1 and the Digger's build difficulty is 10 blocks.
+- **Lists**: the ledger caps a page at 1,000 rows and never counts a total, so every list read follows `next_key`.
+- **Transactions** carry a timeout height (20 blocks). One that isn't found once the chain is past it, with its account sequence unused, provably never ran and is sent again. One whose fate is unknown fails and is never offered again.
+
 ## Proven end to end on a private chain
 
-`devnet/` runs a single-node chain at v0.21.0 on localhost with a mock guild, on its own ports (RPC 46657, LCD 41317, guild 41318):
+`devnet/` runs a single-node chain on localhost with a mock guild, on its own ports (RPC 46657, LCD 41317, guild 41318). It targets v0.22.0: the founding guild pays two Alpha from its vault, and each test player gets a vault with 5 Alpha and 15 on its key, so spends exercise both sources.
 
 ```bash
-STRUCTSD=/path/to/structsd-v0.21.0 bash devnet/setup.sh all
+STRUCTSD=/path/to/structsd-v0.22.0 bash devnet/setup.sh all
 ```
 
-Then start the `pippop-devnet` entry in `.claude/launch.json` (port 5198). From Pip Pop's own UI, all of these landed and were read back from the chain: a new key and club signup (`MsgGuildMembershipJoinProxy` through the guild), finding a mat, making a Digger (build initiate, then the in-browser shake finishing it), the Bear hopping Moon → Grass, rolling the wagon to another pet, three bonks (the third poofed their Bear; damage and counter-blows matched the shown odds), the grab landing by itself (`MsgPlanetRaidComplete`, height 460, code 0), and filling a star into the club's fridge (juice cap 24K → 25K).
+Then start the `pippop-devnet` entry in `.claude/launch.json` (port 5198). On v0.21.0, from Pip Pop's own UI, all of these landed and were read back from the chain: a new key and club signup (`MsgGuildMembershipJoinProxy` through the guild), finding a mat, making a Digger (build initiate, then the in-browser shake finishing it), the Bear hopping Moon → Grass, rolling the wagon to another pet, three bonks (the third poofed their Bear; damage and counter-blows matched the shown odds), the grab landing by itself (`MsgPlanetRaidComplete`, height 460, code 0), and filling a star into the club's fridge (juice cap 24K → 25K).
 
 Keys never leave the tab: the key is sealed with a non-extractable device key in IndexedDB, exactly as in Wyrmhold and the Command Deck.

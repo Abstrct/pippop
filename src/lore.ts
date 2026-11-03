@@ -157,6 +157,7 @@ const OOPS: [RegExp, Word][] = [
 const CODES: Record<string, Word> = {
   nap: { w: 'Nap', i: 'nap' }, juice: { w: 'Juice', i: 'juice' }, bear: { w: 'Bear', i: 'bear' }, away: { w: 'Away', i: 'wagon' },
   rocks: { w: 'Rocks', i: 'rock' }, wind: { w: 'Wind', i: 'wind' }, full: { w: 'Full', i: 'full' }, key: { w: 'Key', i: 'key' },
+  stars: { w: 'Stars', i: 'star' },
 };
 export function oops(text?: string): Word {
   const t = String(text || '');
@@ -180,7 +181,7 @@ const VERB: [RegExp, Word][] = [
   [/FleetMove$/, { w: 'Roll', i: 'roll' }], [/PlanetExplore$/, { w: 'Find', i: 'find' }],
   [/PlanetRaidComplete$/, { w: 'Grab', i: 'grab' }], [/OreMinerComplete$/, { w: 'Dig', i: 'dig' }], [/OreRefineryComplete$/, { w: 'Pop', i: 'pop' }],
   [/ReactorInfuse$/, { w: 'Fill', i: 'fridge' }], [/ReactorDefuse$/, { w: 'Take', i: 'take' }],
-  [/PlayerUpdateName$|PlanetUpdateName$/, { w: 'Name', i: 'kid' }], [/PlayerSend$/, { w: 'Give', i: 'star' }],
+  [/PlayerUpdateName$|PlanetUpdateName$/, { w: 'Name', i: 'kid' }], [/PlayerSend$|VaultSend$/, { w: 'Give', i: 'star' }],
   [/GuildMembership/, { w: 'Club', i: 'club' }],
 ];
 export function verbOf(typeUrl: string): Word {

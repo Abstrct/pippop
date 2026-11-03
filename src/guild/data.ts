@@ -1,6 +1,6 @@
 /* The Guild API as a data source: the guild's indexed copy of the whole chain, read in a handful of
  * small requests instead of hundreds of ledger reads. Its data routes need a session
- * (POST /api/auth/login with a message signed by the kid's own key).
+ * (POST /api/auth/login with a message signed by the kid's own key; POST /api/auth/logout ends it).
  *
  * Two ways to hold that session, the same as the rest of the page (src/guild/relay.ts):
  *  - direct (a static build, the default): the page talks to the guild's API itself with
@@ -97,5 +97,10 @@ export async function gget<T>(path: string): Promise<T> {
   return r.body.data;
 }
 
-/** A forgotten key or another kid: the old session is not theirs. */
-wallet.onForget(() => { loggedIn = null; refused = new Set(); });
+/** A forgotten key: the old session is not theirs. Let go here first, then ask the guild to end it
+ * (POST /api/auth/logout; best effort, nothing waits on it). */
+wallet.onForget(() => {
+  const was = loggedIn;
+  loggedIn = null; refused = new Set();
+  if (was) void call(was.guild, 'auth/logout', { method: 'POST' }).catch(() => undefined);
+});

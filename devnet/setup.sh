@@ -145,6 +145,15 @@ cmd_stop() {
   log "stopped"
 }
 
+# Top a player's or guild's vault up to `minimum` ualpha from bob (the vault's address comes from chain state).
+vault_of() { "$STRUCTSD" query structs vault "$1" "${Q[@]}" | jq -er --arg o "$1" 'select(.ownerId == $o) | .address'; }
+fund_vault() {
+  local v have
+  v=$(vault_of "$1") || die "no vault address for $1"
+  have=$("$STRUCTSD" query bank balances "$v" "${Q[@]}" | jq -r '[.balances[]|select(.denom=="ualpha")][0].amount // "0"')
+  [ "$have" -ge "$2" ] || tx bank send "$(addr bob)" "$v" "$(( $2 - have ))ualpha" --from bob
+}
+
 cmd_bootstrap() {
   wait_height 2
   local alice bob val p1 cap alloc sub reactor eligible guild
@@ -153,7 +162,8 @@ cmd_bootstrap() {
   p1=$(player_of "$alice"); [ -n "$p1" ] || die "alice has no player (genesis validator should)"
   log "alice = player $p1"
 
-  # Alice: allocation → substation → guild (the reactor's proof-free charter, per tests/test_chain.sh).
+  # Alice: allocation → substation → guild. Since v0.22 the one founding path is paid: two Alpha from
+  # the founder's vault (tests/test_chain.sh funds a vault with a plain bank send to its address).
   if [ "$("$STRUCTSD" query structs player "$p1" "${Q[@]}" | jq -r '.Player.guildId // ""')" = "" ]; then
     alloc=$("$STRUCTSD" query structs allocation-all "${Q[@]}" | jq -r --arg p "$p1" '[(.Allocation // [])[] | select(.sourceObjectId==$p)] | last | .id // empty')
     if [ -z "$alloc" ]; then
@@ -167,8 +177,7 @@ cmd_bootstrap() {
       sub=$("$STRUCTSD" query structs allocation "$alloc" "${Q[@]}" | jq -r '.Allocation.destinationId')
     fi
     reactor=$("$STRUCTSD" query structs reactor-all "${Q[@]}" | jq -r '.Reactor[0].id')
-    eligible=$("$STRUCTSD" query structs reactor-all "${Q[@]}" | jq -r '.Reactor[0].guildCharterEligibleHeight // 0')
-    wait_height "$eligible"
+    fund_vault "$p1" 2000000
     tx structs guild-create "$reactor" "devnet.local" "$sub" --from alice
   fi
   reactor=$("$STRUCTSD" query structs reactor-all "${Q[@]}" | jq -r '.Reactor[0].id')
@@ -181,7 +190,9 @@ cmd_bootstrap() {
     tx structs guild-update-endpoint "$guild" "$ep" --from alice
   fi
 
-  # Test players: fund from bob, delegate (the staking hook makes the player), join the guild.
+  # Test players: fund from bob, delegate (the staking hook makes the player), join the guild. Each
+  # vault gets 5 Alpha and 15 stay on the key's own address, so a spend can exercise both: the vault
+  # first, then collecting the shortfall from the key (src/game/funds.ts).
   local k a pid
   for k in tp0 tp1; do
     a=$(addr "$k"); pid=$(player_of "$a")
@@ -190,6 +201,7 @@ cmd_bootstrap() {
       tx staking delegate "$val" 5000000ualpha --from "$k"
       pid=$(player_of "$a")
     fi
+    fund_vault "$pid" 5000000
     if [ "$("$STRUCTSD" query structs player "$pid" "${Q[@]}" | jq -r '.Player.guildId // ""')" != "$guild" ]; then
       tx structs guild-membership-join "$guild" "${reactor}-${a}" --from "$k"
     fi
@@ -220,8 +232,8 @@ cmd_env() {
   LCD          http://127.0.0.1:${API_PORT}
   RPC (ws)     ws://127.0.0.1:${RPC_PORT}/websocket
   mnemonic     $H/test-mnemonic.txt
-  tp0 (idx 0)  $(addr tp0)  player $(player_of "$(addr tp0)")
-  tp1 (idx 1)  $(addr tp1)  player $(player_of "$(addr tp1)")
+  tp0 (idx 0)  $(addr tp0)  player $(player_of "$(addr tp0)")  vault $(vault_of "$(player_of "$(addr tp0)")" 2>/dev/null)
+  tp1 (idx 1)  $(addr tp1)  player $(player_of "$(addr tp1)")  vault $(vault_of "$(player_of "$(addr tp1)")" 2>/dev/null)
   tp2 (idx 2)  $(addr tp2)  (no player)
 
   client:  pnpm devnet:vite   (then node scripts/devnet/cdp.mjs && node scripts/devnet/e2e.mjs "$H/test-mnemonic.txt")

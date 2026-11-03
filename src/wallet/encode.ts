@@ -42,7 +42,11 @@ function asCoin(v: unknown, field: string): { denom: string; amount: string } {
   }
   const c = v as { denom?: string; amount?: unknown } | null;
   if (!c || !c.denom) throw new Error(`${field} needs a denom`);
-  return { denom: c.denom, amount: asUint(c.amount, field).toString() };
+  // A Coin's amount is an SDK Int (up to 256 bits), not a uint64: a guild token's supply can pass 2^64.
+  const s = c.amount == null || c.amount === '' ? '0' : typeof c.amount === 'bigint' ? c.amount.toString() : String(c.amount).trim();
+  if (!/^\d+$/.test(s)) throw new Error(`${field} must be a whole number, got "${s}"`);
+  if (BigInt(s) >= 1n << 256n) throw new Error(`${field} is too large`);
+  return { denom: c.denom, amount: BigInt(s).toString() };
 }
 
 function writeField(w: Writer, f: FieldSpec, v: unknown, owner: string) {

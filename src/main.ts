@@ -75,14 +75,14 @@ async function route() {
 
 /* Rites that land or fail: one bubble each, wherever you are. */
 const toyIn = (j: { msgs: { value: unknown }[] }) => {
-  const v = (j.msgs[0]?.value || {}) as Record<string, unknown>;
+  const v = (j.msgs[j.msgs.length - 1]?.value || {}) as Record<string, unknown>;
   if (v.structTypeId) return toy(Number(v.structTypeId)).icon;
   const sid = String(v.structId || v.operatingStructId || v.defenderStructId || '');
   for (const p of empire.players.values()) { const s = p.structs.get(sid); if (s) return toy(s.typeId).icon; }
   return undefined;
 };
 txq.onSettled((j) => {
-  const url = j.msgs[0]?.typeUrl || '';
+  const url = j.msgs[j.msgs.length - 1]?.typeUrl || '';   // the act itself, after any collection of stars
   const v = verbOf(url);
   if (j.status === 'success') {
     if (/PlanetRaidComplete$/.test(url)) return; // the shout tells it

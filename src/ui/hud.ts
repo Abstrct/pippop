@@ -3,6 +3,7 @@
 import { h, clear, morph } from '../core/dom';
 import { icon } from './icons';
 import { empire } from '../game/empire';
+import { available } from '../game/funds';
 import { wallet } from '../wallet/wallet';
 import { txq } from '../wallet/queue';
 import { pow, type PowTask } from '../pow/pow';
@@ -56,7 +57,7 @@ export function mountHud(root: HTMLElement) {
     const m = (ic: string, label: string, val: string | Node, bad = false, sub?: string) => h('span', { class: 'meter' + (bad ? ' bad' : ''), role: 'img', 'aria-label': `${label} ${typeof val === 'string' ? val : ''}` }, icon(ic, 36), val, sub ? h('span', { class: 'sub' }, sub) : null);
     const pips = h('span', { class: 'pips' }, ...Array.from({ length: 8 }, (_, i) => h('i', { class: i < Math.min(8, wind) ? (wind >= 8 ? 'on full' : 'on') : '' })));
     meters.append(
-      m('star', 'Stars', fmtStars(p.alpha)),
+      m('star', 'Stars', fmtStars(available(p))),
       m('rock', 'Rocks', String(p.ore), p.ore > 0),
       m('juice', 'Juice', fmtJuice(spare > 0n ? spare : 0n), !p.online || spare < 0n, '/' + fmtJuice(p.capacity + p.connectionCapacity)),
       h('span', { class: 'meter', role: 'img', 'aria-label': `Wind ${wind}`, title: 'Wind' }, icon('wind', 36), pips, h('span', null, short(wind))),
@@ -133,7 +134,7 @@ export function mountHud(root: HTMLElement) {
     }
     const jobs = txq.active.filter((j) => j.source !== 'pow' && (!j.playerId || mine.has(j.playerId)));
     for (const j of jobs.slice(0, 4)) {
-      const m = j.msgs[0];
+      const m = j.msgs[j.msgs.length - 1];   // the act itself: any collection of stars comes first
       const v = verbOf(m?.typeUrl || '');
       const val = (m?.value || {}) as Record<string, unknown>;
       const tId = Number(val.structTypeId) || (() => { const sid = String(val.structId || val.operatingStructId || val.defenderStructId || ''); for (const pl of empire.players.values()) { const s = pl.structs.get(sid); if (s) return s.typeId; } return 0; })();

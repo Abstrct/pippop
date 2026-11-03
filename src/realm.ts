@@ -1,6 +1,6 @@
 /* Reading the ledger as a toy box: a kid's toys on their mat, free spots for new toys, and every
  * other kid out there. */
-import { LCD_URL, lcd, num, type PlanetFull, type RawFleet, type RawPlayer } from './chain/lcd';
+import { LCD_URL, PAGE_MAX, lcd, num, type PlanetFull, type RawFleet, type RawPlayer } from './chain/lcd';
 import type { OwnedStruct, PlayerState } from './game/empire';
 import { reservedSlots } from './game/actions';
 import { AMBIT_FLAG, AMBITS, typeOf, type Ambit, type StructType } from './data/catalogue';
@@ -104,11 +104,22 @@ let sightCache: { at: number; map: Map<string, Sight> } | null = null;
  * "<attr>-1-<kid index>": 0 is stored ore, 11 the last action's block. */
 export async function sight(force = false): Promise<Map<string, Sight>> {
   if (!force && sightCache && Date.now() - sightCache.at < 60_000) return sightCache.map;
-  const from = (prefix: string) => encodeURIComponent(btoa(prefix));
+  // Every record under one attribute prefix: start at the prefix's key and page on (the ledger serves
+  // at most PAGE_MAX a page) until the keys leave it.
   const page = async (prefix: string) => {
-    const r = await fetch(`${LCD_URL}/structs/grid?pagination.limit=8000&pagination.key=${from(prefix)}`);
-    if (!r.ok) throw new Error(`answered ${r.status}`);
-    return ((await r.json()).gridRecords || []) as { attributeId: string; value: string }[];
+    const out: { attributeId: string; value: string }[] = [];
+    let key = btoa(prefix);
+    for (let guard = 0; key && guard < 50; guard++) {
+      const r = await fetch(`${LCD_URL}/structs/grid?pagination.limit=${PAGE_MAX}&pagination.key=${encodeURIComponent(key)}`);
+      if (!r.ok) throw new Error(`answered ${r.status}`);
+      const body = await r.json() as { gridRecords?: { attributeId: string; value: string }[]; pagination?: { next_key?: string | null } };
+      const rows = body.gridRecords || [];
+      const inside = rows.filter((g) => g.attributeId.startsWith(prefix));
+      out.push(...inside);
+      if (inside.length < rows.length) break;
+      key = body.pagination?.next_key || '';
+    }
+    return out;
   };
   const [oreRecs, lastRecs] = await Promise.all([page('0-1-'), page('11-1-')]);
   const map = new Map<string, Sight>();

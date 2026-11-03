@@ -7,10 +7,10 @@
 //   GET  /api/timestamp                                {unix_timestamp}
 //   GET  /api/guild/this                               the guild row (from the LCD)
 //   POST /api/auth/signup                              202, then the guild's job: the owner key broadcasts
-//                                                      MsgGuildMembershipJoinProxy (structsd CLI, v0.21 args:
+//                                                      MsgGuildMembershipJoinProxy (structsd CLI, v0.22 args:
 //                                                      [address] [proof pubkey] [proof signature] --player-name)
 //   POST /api/auth/login                               checks the address is this guild's player; sets a session cookie
-//   GET  /api/auth/logout
+//   POST /api/auth/logout                              (POST only, like the Guild API since webapp 0.22)
 //   GET  /api/auth/player-address/<addr>/guild/<g>/player-id
 //   anything else                                      404 in the API's envelope
 //
@@ -107,7 +107,7 @@ createServer(async (req, res) => {
       sessions.set(sid, { playerId: a.playerId, address: b.address });
       return send(res, 200, null, [], { 'set-cookie': `PHPSESSID=${sid}; Path=/; HttpOnly; SameSite=Lax` });
     }
-    if (p === '/api/auth/logout') { sessions.delete(cookie(req)); return send(res, 200, null, [], { 'set-cookie': 'PHPSESSID=deleted; Path=/; Max-Age=0' }); }
+    if (p === '/api/auth/logout' && req.method === 'POST') { sessions.delete(cookie(req)); return send(res, 200, null, [], { 'set-cookie': 'PHPSESSID=deleted; Path=/; Max-Age=0' }); }
     const m = /^\/api\/auth\/player-address\/([a-z0-9]+)\/guild\/([0-9-]+)\/player-id$/.exec(p);
     if (m) {
       const a = await lcd(`/structs/address/${m[1]}`).catch(() => null);

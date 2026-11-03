@@ -84,13 +84,17 @@ export interface RawReactor { id: string; validator: string; guildId: string; de
 export interface RawSubstation { id: string; owner: string; creator: string; name: string; pfp: string }
 export interface RawAllocation { id: string; type: string; sourceObjectId: string; index: string; destinationId: string; controller: string }
 export interface RawProvider { id: string; substationId: string; rate: { denom: string; amount: string }; accessPolicy: string; capacityMinimum: string; capacityMaximum: string; durationMinimum: string; durationMaximum: string; owner: string }
-export interface RawInfusion { destinationType: string; destinationId: string; fuel: string; power: string; commission: string; playerId: string; address: string; ratio: string; defusing: string }
+/** `ownerId` (v0.22) names the player or guild that owns the position; empty means `playerId`. */
+export interface RawInfusion { destinationType: string; destinationId: string; fuel: string; power: string; commission: string; playerId: string; address: string; ratio: string; defusing: string; ownerId?: string; generatorDisabled?: boolean }
 
 export interface PlayerFull { Player: RawPlayer; gridAttributes?: Grid; playerInventory?: { rocks?: { denom: string; amount: string } } }
 export interface PlanetFull { Planet: RawPlanet; gridAttributes?: Grid; planetAttributes?: PlanetAttributes }
 export interface StructFull { Struct: RawStruct; structAttributes?: StructAttributes; gridAttributes?: Grid; structDefenders?: string[] }
 
 /* ── Queries ────────────────────────────────────────────────────────────── */
+
+/** The most rows a ledger list page holds (v0.22 caps `pagination.limit` here and never counts a total). */
+export const PAGE_MAX = 1000;
 
 export const lcd = {
   player: (id: string) => get<PlayerFull>(`/structs/player/${encodeURIComponent(id)}`),
@@ -99,17 +103,26 @@ export const lcd = {
   struct: (id: string) => get<StructFull>(`/structs/struct/${encodeURIComponent(id)}`),
   guild: (id: string) => get<{ Guild: RawGuild }>(`/structs/guild/${encodeURIComponent(id)}`).then((r) => r.Guild),
   address: (addr: string) => get<{ playerId: string }>(`/structs/address/${encodeURIComponent(addr)}`),
+  /** A player's or guild's vault (v0.22): the protocol address its spendable assets live at. */
+  vault: (ownerId: string) => get<{ ownerId: string; address: string; provisioned: boolean }>(`/structs/vault/${encodeURIComponent(ownerId)}`),
+  /** Alpha an address can spend right now (vesting and staked coins excluded). */
+  spendable: (address: string) => get<{ balance?: { denom: string; amount: string } }>(`/cosmos/bank/v1beta1/spendable_balances/${encodeURIComponent(address)}/by_denom?denom=ualpha`)
+    .then((r) => big(r.balance?.amount)),
+  /** One address's position in a reactor or generator; null when it holds none. */
+  infusion: (destinationId: string, address: string) => get<{ Infusion: RawInfusion }>(`/structs/infusion/${encodeURIComponent(destinationId)}/${encodeURIComponent(address)}`)
+    .then((r) => r.Infusion, (e) => { if (/not found/i.test((e as Error).message)) return null; throw e; }),
   planetsByPlayer: (id: string) => get<{ Planet: RawPlanet[] }>(`/structs/planet_by_player/${encodeURIComponent(id)}`).then((r) => r.Planet || []),
   /** Any entity with its grid attributes: reactor, substation, allocation, provider… */
   entity: <T>(kind: string, id: string) => get<T>(`/structs/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`),
   latestHeight: () => get<{ block: { header: { height: string; time: string } } }>(`/cosmos/base/tendermint/v1beta1/blocks/latest`)
     .then((r) => ({ height: Number(r.block.header.height), time: r.block.header.time })),
 
-  /** Page through a list endpoint; `onPage` sees each page as it lands. */
+  /** Page through a list endpoint; `onPage` sees each page as it lands. The ledger serves at most
+   * PAGE_MAX rows a page (and no totals) since v0.22, so the next_key is what moves us along. */
   async list<T>(entity: string, field: string, opts: { limit?: number; onPage?: (rows: T[]) => void; signal?: { cancelled: boolean } } = {}): Promise<T[]> {
     const out: T[] = [];
     let key = '';
-    const limit = opts.limit ?? 5000;
+    const limit = Math.min(opts.limit ?? PAGE_MAX, PAGE_MAX);
     for (let guard = 0; guard < 200; guard++) {
       if (opts.signal?.cancelled) break;
       const q = `pagination.limit=${limit}` + (key ? `&pagination.key=${encodeURIComponent(key)}` : '');

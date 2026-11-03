@@ -11,7 +11,7 @@ import { live } from '../chain/live';
 import { empire, type PlayerState } from '../game/empire';
 import { txq } from '../wallet/queue';
 import { wallet } from '../wallet/wallet';
-import { difficultyAt } from './sha';
+import { ageFor, difficultyAt } from './sha';
 import { GpuHasher } from './gpu';
 import { safeEach } from '../core/util';
 import { leader } from '../core/leader';
@@ -140,8 +140,8 @@ class PowEngine {
 
   /** Blocks from now until the bar falls to `zeros`. */
   blocksUntil(t: PowTask, zeros: number): number {
-    if (t.range <= 1) return Infinity;
-    const age = Math.ceil(Math.pow(t.range, (64 - zeros) / 63));
+    const age = ageFor(t.range, zeros);
+    if (!Number.isFinite(age)) return Infinity;
     return Math.max(0, t.blockStart + age - (live.height + 1));
   }
 
